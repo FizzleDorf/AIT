@@ -5,7 +5,7 @@ from diffusers import AutoencoderKL, ControlNetModel, UNet2DConditionModel
 from transformers import CLIPTextModel
 
 from ait.module import Model
-from ait.util import torch_dtype_from_str
+from ait.util import torch_dtype_from_str, convert_ldm_unet_checkpoint, convert_text_enc_state_dict, convert_ldm_vae_checkpoint
 from ait.util.mapping import map_clip, map_controlnet, map_unet, map_vae
 
 
@@ -29,6 +29,51 @@ class AITLoader:
     ) -> Model:
         aitemplate = Model(lib_path=path, num_runtimes=self.num_runtimes)
         return aitemplate
+
+    def compvis_unet(
+        self,
+        state_dict: dict,
+    ) -> dict:
+        """
+        removes:
+        model.diffusion_model.
+        from keys if present before conversion
+        """
+        return convert_ldm_unet_checkpoint(state_dict)
+    
+    def compvis_clip(
+        self,
+        state_dict: dict,
+    ) -> dict:
+        """
+        removes:
+        cond_stage_model.transformer.
+        cond_stage_model.model.
+        from keys if present before conversion
+        """
+        return convert_text_enc_state_dict(state_dict)
+    
+    def compvis_vae(
+        self,
+        state_dict: dict,
+    ) -> dict:
+        """
+        removes:
+        first_stage_model.
+        from keys if present before conversion
+        """
+        return convert_ldm_vae_checkpoint(state_dict)
+    
+    def compvis_controlnet(
+        self,
+        state_dict: dict,
+    ) -> dict:
+        """
+        removes:
+        control_model.
+        from keys if present before conversion
+        """
+        return convert_ldm_unet_checkpoint(state_dict, controlnet=True)
 
     def diffusers_unet(
         self,
