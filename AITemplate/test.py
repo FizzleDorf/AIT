@@ -1,4 +1,4 @@
-from ait import AIT
+from ait.ait import AIT
 
 if __name__ == "__main__":
     ait = AIT()

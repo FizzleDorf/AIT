@@ -2,12 +2,19 @@
  
 Experimental usage of [AITemplate](https://github.com/facebookincubator/AITemplate).
 
+Also functions as a ComfyUI custom node
+* Drop `AITemplate` folder in `ComfyUI/custom_nodes/`
+* Put modules in `AITemplate/modules/`
+* Supports UNet, ControlNet and VAE
+
+[Pre-compiled modules](https://huggingface.co/datasets/hlky/aitemplate)
+
 ## TODO
 
-* Mapping VAE depends on AITemplate, specifically AIT_AutoencoderKL, figure out a way to map the parameters without it
+* ~~Mapping VAE depends on AITemplate, specifically AIT_AutoencoderKL, figure out a way to map the parameters without it~~
 * ~~Load from LDM models, just needs putting together~~
 * ~~More inference examples~~
-* Documentation
+* ~~Documentation~~ More documentation
 * ????
 
 ## Supported model types

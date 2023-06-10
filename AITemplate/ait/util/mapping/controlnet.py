@@ -1,5 +1,5 @@
 import torch
-from ait.util import torch_dtype_from_str
+from ...util import torch_dtype_from_str
 
 
 def map_controlnet(pt_mod, dim=320, device="cuda", dtype="float16"):

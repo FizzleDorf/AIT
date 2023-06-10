@@ -3,7 +3,8 @@ from typing import Literal, Union
 import torch
 from safetensors.torch import load_file
 
-from ait import AITLoader, clip_inference, unet_inference, vae_inference, controlnet_inference
+from .load import AITLoader
+from .inference import clip_inference, unet_inference, vae_inference, controlnet_inference
 
 
 class AIT:

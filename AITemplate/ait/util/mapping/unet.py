@@ -1,5 +1,5 @@
 import torch
-from ait.util import torch_dtype_from_str
+from ...util import torch_dtype_from_str
 
 def map_unet(pt_mod, in_channels=None, conv_in_key=None, dim=320, device="cuda", dtype="float16"):
     if in_channels is not None and conv_in_key is None:

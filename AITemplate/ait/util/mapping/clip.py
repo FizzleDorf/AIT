@@ -1,6 +1,6 @@
 from transformers import CLIPTextConfig, CLIPTextModel
 
-from ait.util import torch_dtype_from_str
+from ...util import torch_dtype_from_str
 
 
 def map_clip(pt_mod, device="cuda", dtype="float16"):

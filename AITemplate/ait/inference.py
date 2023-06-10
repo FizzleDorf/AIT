@@ -2,7 +2,7 @@ from typing import List
 
 import torch
 
-from ait.module import Model
+from .module import Model
 
 
 class AITemplateModelWrapper(torch.nn.Module):
@@ -10,19 +10,19 @@ class AITemplateModelWrapper(torch.nn.Module):
         self,
         unet_ait_exe: Model,
         alphas_cumprod: torch.Tensor,
-        conditioning_key: str = None,
     ):
         super().__init__()
-        self.unet_ait_exe = unet_ait_exe
         self.alphas_cumprod = alphas_cumprod
-        #TODO: use the conditioning key
-        self.conditioning_key = conditioning_key
+        self.unet_ait_exe = unet_ait_exe
 
     def apply_model(
         self,
         x: torch.Tensor,
         t: torch.Tensor,
-        cond: dict,
+        c_crossattn = None,
+        c_concat = None,
+        control = None,
+        transformer_options = None,
     ):
         timesteps_pt = t
         latent_model_input = x
@@ -30,16 +30,14 @@ class AITemplateModelWrapper(torch.nn.Module):
         down_block_residuals = None
         mid_block_residual = None
         #TODO: verify this is correct/match DiffusionWrapper (ddpm.py)
-        if 'c_crossattn' in cond:
-            encoder_hidden_states = cond['c_crossattn']
+        if c_crossattn is not None:
+            encoder_hidden_states = c_crossattn
             encoder_hidden_states = encoder_hidden_states[0]
-        if 'c_concat' in cond:
-            encoder_hidden_states = cond['c_concat']
-        if "control" in cond:
-            down_block_residuals = cond["control"]["output"]
-            mid_block_residual = cond["control"]["middle"][0]
-        if encoder_hidden_states is None:
-            raise f"conditioning missing, it should be one of these {cond.keys()}"
+        if c_concat is not None:
+            encoder_hidden_states = c_concat
+        if control is not None:
+            down_block_residuals = control["output"]
+            mid_block_residual = control["middle"][0]
         return unet_inference(
             self.unet_ait_exe,
             latent_model_input=latent_model_input,
@@ -86,7 +84,7 @@ def unet_inference(
     num_outputs = len(exe_module.get_output_name_to_index_map())
     for i in range(num_outputs):
         shape = exe_module.get_output_maximum_shape(i)
-        shape[0] = batch * 2
+        shape[0] = batch
         shape[1] = height
         shape[2] = width
         ys.append(torch.empty(shape).cuda().half())

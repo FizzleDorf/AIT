@@ -95,7 +95,7 @@ def compile_vae(
     ait_vae.name_parameter_tensor()
 
     pt_mod = pt_mod.eval()
-    params_ait = map_vae(ait_vae, pt_mod, dtype=dtype)
+    params_ait = map_vae(pt_mod, dtype=dtype)
 
     Y = ait_vae.decode(ait_input)
     mark_output(Y)
