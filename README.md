@@ -5,7 +5,8 @@ Experimental usage of [AITemplate](https://github.com/facebookincubator/AITempla
 ## TODO
 
 * Mapping VAE depends on AITemplate, specifically AIT_AutoencoderKL, figure out a way to map the parameters without it
-* Load from LDM models, just needs putting together
+* ~~Load from LDM models, just needs putting together~~
+* ~~More inference examples~~
 * Documentation
 * ????
 
@@ -20,3 +21,14 @@ Experimental usage of [AITemplate](https://github.com/facebookincubator/AITempla
 * DeepFloyd
 * Inpaint
 
+### [Compile](https://github.com/hlky/AIT/blob/main/docs/compile.md)
+
+### [CLIP](https://github.com/hlky/AIT/blob/main/docs/clip.md)
+
+### [ControlNet](https://github.com/hlky/AIT/blob/main/docs/controlnet.md)
+
+### [CompVis](https://github.com/hlky/AIT/blob/main/docs/compvis.md)
+
+### [UNet](https://github.com/hlky/AIT/blob/main/docs/unet.md)
+
+### [VAE](https://github.com/hlky/AIT/blob/main/docs/vae.md)
