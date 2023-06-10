@@ -211,11 +211,8 @@ class ControlNetModel(nn.Module):
         # 2. pre-process
         sample = self.conv_in(sample)
 
-        print("sample", self.get_shape(sample))
         controlnet_cond = self.controlnet_cond_embedding(controlnet_cond)
-        print("controlnet_cond", self.get_shape(controlnet_cond))
         sample = sample + controlnet_cond
-        print("sample", self.get_shape(sample))
         # 3. down
         down_block_res_samples = (sample,)  # up to but excluding last element
         sample, res_samples = self.down_blocks[0](

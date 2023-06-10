@@ -54,7 +54,6 @@ def get_down_block(
     use_linear_projection=False,
     only_cross_attention=False,
 ):
-    print(f"down_block_type: {down_block_type}, num_layers: {num_layers}, in_channels: {in_channels}, out_channels: {out_channels}, temb_channels: {temb_channels}, add_downsample: {add_downsample}, resnet_eps: {resnet_eps}, resnet_act_fn: {resnet_act_fn}, attn_num_head_channels: {attn_num_head_channels}, cross_attention_dim: {cross_attention_dim}, downsample_padding: {downsample_padding}, use_linear_projection: {use_linear_projection}")
     down_block_type = (
         down_block_type[7:]
         if down_block_type.startswith("UNetRes")

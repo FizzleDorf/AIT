@@ -105,7 +105,6 @@ class UNet2DConditionModel(nn.Module):
             in_channels = 4
         elif in_channels > 4 and in_channels <= 8:
             in_channels = 8
-        print(in_channels)
         conv_in_padding = (conv_in_kernel - 1) // 2
         self.conv_in = nn.Conv2dBias(in_channels, block_out_channels[0], 3, 1, conv_in_padding)
         # time
@@ -134,7 +133,6 @@ class UNet2DConditionModel(nn.Module):
             input_channel = output_channel
             output_channel = block_out_channels[i]
             is_final_block = i == len(block_out_channels) - 1
-            print(f"down block {i} {down_block_type}")
             down_block = get_down_block(
                 down_block_type,
                 num_layers=layers_per_block,
@@ -244,18 +242,13 @@ class UNet2DConditionModel(nn.Module):
 
             class_emb = ops.batch_gather()(self.class_embedding.weight.tensor(), class_labels)
             emb = emb + class_emb
-        x_shape = sample._attrs["shape"]
-        print(x_shape)
-        ndim = len(x_shape)
-        print("ndim", ndim)
         # 2. pre-process
         if self.in_channels > 4 and self.in_channels < 9:
-            sample = ops.nhwc7to8()(sample)
+            sample = ops.pad_last_dim(4, 8)(sample)
         elif self.in_channels >= 1 and self.in_channels < 4:
-            sample = ops.pad_last_dim(ndim, 4)(sample)
+            sample = ops.pad_last_dim(4, 4)(sample)
         else:
             sample = sample # may raise error if >= 9
-        print(sample._attrs["shape"])
         sample = self.conv_in(sample)
 
         # 3. down

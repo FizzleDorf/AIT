@@ -58,11 +58,8 @@ class CrossAttention(nn.Module):
         self.dim_head = dim_head
 
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False, dtype=dtype)
-        print(f"to_q {query_dim} {inner_dim}")
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False, dtype=dtype)
-        print(f"to_k {context_dim} {inner_dim}")
         self.to_v = nn.Linear(context_dim, inner_dim, bias=False, dtype=dtype)
-        print(f"to_v {context_dim} {inner_dim}")
         self.to_out = nn.Sequential(
             nn.Linear(inner_dim, query_dim, dtype=dtype), nn.Dropout(dropout, dtype=dtype)
         )
@@ -172,7 +169,6 @@ class BasicTransformerBlock(nn.Module):
         )
         else:
             self.attn2 = None
-        print(f"LayerNorm: {dim}")
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
@@ -213,7 +209,6 @@ class SpatialTransformer(nn.Module):
         only_cross_attention=False,
         dtype="float16"
     ):
-        print(f"{in_channels}, {n_heads}, {d_head}, {depth}, {dropout}, {context_dim}, {use_linear_projection}")
         super().__init__()
         self.in_channels = in_channels
         inner_dim = n_heads * d_head
