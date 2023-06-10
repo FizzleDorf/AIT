@@ -1,7 +1,9 @@
-from ait import AITLoader
-from ait import unet_inference, clip_inference, vae_inference
-from typing import Union, Literal
+from typing import Literal, Union
+
 import torch
+
+from ait import AITLoader, clip_inference, unet_inference, vae_inference
+
 
 class AIT:
     def __init__(self) -> None:
@@ -10,9 +12,9 @@ class AIT:
         self.supported = ['clip', 'controlnet', 'unet', 'vae']
 
     def load(self,
-        aitemplate_path,
-        hf_hub_or_path,
-        module_type,
+        aitemplate_path: str,
+        hf_hub_or_path: str,
+        module_type: str,
     ):
         if module_type == "clip":
             self.modules["clip"] = self.loader.load(aitemplate_path)

@@ -1,15 +1,29 @@
+from typing import List
+
 import torch
+
+from ait.module import Model
 
 
 class AITemplateModelWrapper(torch.nn.Module):
-    def __init__(self, unet_ait_exe, alphas_cumprod, conditioning_key=None):
+    def __init__(
+        self,
+        unet_ait_exe: Model,
+        alphas_cumprod: torch.Tensor,
+        conditioning_key: str = None,
+    ):
         super().__init__()
         self.unet_ait_exe = unet_ait_exe
         self.alphas_cumprod = alphas_cumprod
         #TODO: use the conditioning key
         self.conditioning_key = conditioning_key
 
-    def apply_model(self, x, t, cond):
+    def apply_model(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+        cond: dict,
+    ):
         timesteps_pt = t
         latent_model_input = x
         encoder_hidden_states = None
@@ -37,7 +51,13 @@ class AITemplateModelWrapper(torch.nn.Module):
 
 
 def unet_inference(
-    exe_module, latent_model_input, timesteps, encoder_hidden_states, class_labels=None, down_block_residuals=None, mid_block_residual=None
+    exe_module: Model,
+    latent_model_input: torch.Tensor,
+    timesteps: torch.Tensor,
+    encoder_hidden_states: torch.Tensor,
+    class_labels: torch.Tensor = None,
+    down_block_residuals: List[torch.Tensor] = None,
+    mid_block_residual: torch.Tensor = None,
 ):
     batch = latent_model_input.shape[0]
     height, width = latent_model_input.shape[2], latent_model_input.shape[3]
@@ -69,7 +89,11 @@ def unet_inference(
     return noise_pred
 
 
-def vae_inference(exe_module, vae_input, factor = 8):
+def vae_inference(
+    exe_module: Model,
+    vae_input: torch.Tensor,
+    factor: int = 8,
+):
     batch = vae_input.shape[0]
     height, width = vae_input.shape[2], vae_input.shape[3]
     inputs = [torch.permute(vae_input, (0, 2, 3, 1)).contiguous().cuda()]
@@ -86,7 +110,11 @@ def vae_inference(exe_module, vae_input, factor = 8):
     return vae_out
 
 
-def clip_inference(exe_module, input_ids, seqlen=77):
+def clip_inference(
+    exe_module: Model,
+    input_ids: torch.Tensor,
+    seqlen: int = 77,
+):
     batch = input_ids.shape[0]
     position_ids = torch.arange(seqlen).expand((batch, -1)).cuda()
     inputs = {
