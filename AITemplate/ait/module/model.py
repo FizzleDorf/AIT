@@ -175,6 +175,15 @@ class Model:
             lib_path: str,
         ):
             self.lib_path = lib_path
+            if lib_path.endswith(".xz"):
+                import lzma
+                import tempfile
+
+                temp_file = tempfile.NamedTemporaryFile(delete=False)
+                temp_file.write(lzma.decompress(open(lib_path, "rb").read(), format=lzma.FORMAT_AUTO))
+                temp_file.close()
+                lib_path = temp_file.name
+                
             self.DLL = ctypes.cdll.LoadLibrary(lib_path)
             self.is_open = True
 

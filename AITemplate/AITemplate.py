@@ -14,7 +14,7 @@ from .ait.inference import AITemplateModelWrapper
 from .ait import AIT
 from .ait.inference import clip_inference, unet_inference, vae_inference, controlnet_inference
 
-supported_ait_extensions = set(['.so'])
+supported_ait_extensions = set(['.so', '.xz'])
 base_path = os.path.dirname(os.path.realpath(__file__))
 modules_dir = os.path.join(base_path, "modules")
 folder_names_and_paths = {}
