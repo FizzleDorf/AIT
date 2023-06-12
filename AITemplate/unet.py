@@ -17,7 +17,12 @@ import logging
 import click
 import torch
 from aitemplate.testing import detect_target
-from diffusers import UNet2DConditionModel
+try:
+    from diffusers import UNet2DConditionModel
+except ImportError:
+    raise ImportError(
+        "Please install diffusers with `pip install diffusers` to use this script."
+    )
 from ait.compile.unet import compile_unet
 
 @click.command()

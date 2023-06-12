@@ -17,7 +17,12 @@ import logging
 import click
 import torch
 from aitemplate.testing import detect_target
-from diffusers import AutoencoderKL
+try:
+    from diffusers import AutoencoderKL
+except ImportError:
+    raise ImportError(
+        "Please install diffusers with `pip install diffusers` to use this script."
+    )
 from ait.compile.vae import compile_vae
 
 @click.command()

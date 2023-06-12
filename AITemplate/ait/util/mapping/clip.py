@@ -1,4 +1,9 @@
-from transformers import CLIPTextConfig, CLIPTextModel
+try:
+    from transformers import CLIPTextConfig, CLIPTextModel
+except ImportError:
+    raise ImportError(
+        "Please install transformers with `pip install transformers` to use this script."
+    )
 
 from ...util import torch_dtype_from_str
 

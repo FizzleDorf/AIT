@@ -133,7 +133,12 @@ class AIT:
     ):
         if "clip" not in self.modules:
             raise ValueError("clip module not loaded")
-        from transformers import CLIPTokenizer
+        try:
+            from transformers import CLIPTokenizer
+        except ImportError:
+            raise ImportError(
+                "Please install transformers with `pip install transformers` to use this script."
+            )
         if tokenizer is None:
             tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         text_input = tokenizer(

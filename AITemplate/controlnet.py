@@ -17,7 +17,12 @@ import logging
 import click
 import torch
 from aitemplate.testing import detect_target
-from diffusers import ControlNetModel
+try:
+    from diffusers import ControlNetModel
+except ImportError:
+    raise ImportError(
+        "Please install diffusers with `pip install diffusers` to use this script."
+    )
 from ait.compile.controlnet import compile_controlnet
 
 @click.command()

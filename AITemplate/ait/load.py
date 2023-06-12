@@ -1,8 +1,14 @@
 from typing import Union
 
 import torch
-from diffusers import AutoencoderKL, ControlNetModel, UNet2DConditionModel
-from transformers import CLIPTextModel
+try:
+    from diffusers import AutoencoderKL, ControlNetModel, UNet2DConditionModel
+except ImportError:
+    print("diffusers not installed, cannot load diffusers models")
+try:
+    from transformers import CLIPTextModel
+except ImportError:
+    print("transformers not installed, cannot load transformers models")
 
 from .module import Model
 from .util import torch_dtype_from_str, convert_ldm_unet_checkpoint, convert_text_enc_state_dict, convert_ldm_vae_checkpoint
@@ -36,6 +42,7 @@ class AITLoader:
         """
         removes:
         model.diffusion_model.
+        diffusion_model.
         from keys if present before conversion
         """
         return convert_ldm_unet_checkpoint(state_dict)
@@ -80,7 +87,7 @@ class AITLoader:
         dtype: str = "float16",
         subfolder: str = "unet",
         revision: str = "fp16",
-    ) -> UNet2DConditionModel:
+    ):
         return UNet2DConditionModel.from_pretrained(
             hf_hub_or_path,
             subfolder=subfolder,
@@ -94,7 +101,7 @@ class AITLoader:
         dtype: str = "float16",
         subfolder: str = "vae",
         revision: str = "fp16",
-    ) -> AutoencoderKL:
+    ):
         return AutoencoderKL.from_pretrained(
             hf_hub_or_path,
             subfolder=subfolder,
@@ -108,7 +115,7 @@ class AITLoader:
         dtype: str = "float16",
         subfolder: str = None,
         revision: str = None,
-    ) -> ControlNetModel:
+    ):
         return ControlNetModel.from_pretrained(
             hf_hub_or_path,
             subfolder=subfolder,
@@ -122,7 +129,7 @@ class AITLoader:
         dtype: str = "float16",
         subfolder: str = "text_encoder",
         revision: str = "fp16",
-    ) -> CLIPTextModel:
+    ):
         return CLIPTextModel.from_pretrained(
             hf_hub_or_path,
             subfolder=subfolder,
@@ -142,7 +149,7 @@ class AITLoader:
     def apply_unet(
         self,
         aitemplate_module: Model,
-        unet: Union[UNet2DConditionModel, dict],
+        unet,#: Union[UNet2DConditionModel, dict],
         in_channels: int = None,
         conv_in_key: str = None,
         dim: int = 320,
@@ -161,7 +168,7 @@ class AITLoader:
     def apply_clip(
         self,
         aitemplate_module: Model,
-        clip: Union[CLIPTextModel, dict],
+        clip,#: Union[CLIPTextModel, dict],
         device: Union[str, torch.device] = None,
         dtype: str = None,
     ) -> Model:
@@ -173,7 +180,7 @@ class AITLoader:
     def apply_controlnet(
         self,
         aitemplate_module: Model,
-        controlnet: Union[ControlNetModel, dict],
+        controlnet,#: Union[ControlNetModel, dict],
         dim: int = 320,
         device: Union[str, torch.device] = None,
         dtype: str = None,
@@ -186,7 +193,7 @@ class AITLoader:
     def apply_vae(
         self,
         aitemplate_module: Model,
-        vae: Union[AutoencoderKL, dict],
+        vae,#: Union[AutoencoderKL, dict],
         device: Union[str, torch.device] = None,
         dtype: str = None,
     ) -> Model:

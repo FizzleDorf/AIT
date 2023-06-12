@@ -17,7 +17,12 @@ import logging
 import click
 import torch
 from aitemplate.testing import detect_target
-from transformers import CLIPTextModel
+try:
+    from transformers import CLIPTextModel
+except ImportError:
+    raise ImportError(
+        "Please install transformers with `pip install transformers` to use this script."
+    )
 from ait.compile.clip import compile_clip
 
 @click.command()

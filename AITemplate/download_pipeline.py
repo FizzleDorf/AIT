@@ -14,7 +14,12 @@
 #
 import click
 import torch
-from diffusers import StableDiffusionPipeline
+try:
+    from diffusers import StableDiffusionPipeline
+except ImportError:
+    raise ImportError(
+        "Please install diffusers with `pip install diffusers` to use this script."
+    )
 
 
 @click.command()
