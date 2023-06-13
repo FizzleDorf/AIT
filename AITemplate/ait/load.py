@@ -196,8 +196,9 @@ class AITLoader:
         vae,#: Union[AutoencoderKL, dict],
         device: Union[str, torch.device] = None,
         dtype: str = None,
+        encoder: bool = False,
     ) -> Model:
         device = self.device if device is None else device
         dtype = self.dtype if dtype is None else dtype
-        ait_params = map_vae(vae, device=device, dtype=dtype)
+        ait_params = map_vae(vae, device=device, dtype=dtype, encoder=encoder)
         return self.apply(aitemplate_module, ait_params)

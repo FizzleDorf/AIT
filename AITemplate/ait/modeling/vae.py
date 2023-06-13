@@ -18,8 +18,9 @@ Translated from https://github.com/huggingface/diffusers/blob/main/src/diffusers
 from typing import Tuple
 
 from aitemplate.frontend import nn, Tensor
+from aitemplate.compiler import ops
 
-from .unet_blocks import get_up_block, UNetMidBlock2D
+from .unet_blocks import get_down_block, get_up_block, UNetMidBlock2D
 
 
 class Decoder(nn.Module):
@@ -115,6 +116,153 @@ class Decoder(nn.Module):
         return sample
 
 
+class Encoder(nn.Module):
+    def __init__(
+        self,
+        batch_size,
+        height,
+        width,
+        in_channels=3,
+        out_channels=3,
+        down_block_types=("DownEncoderBlock2D",),
+        block_out_channels=(64,),
+        layers_per_block=2,
+        norm_num_groups=32,
+        act_fn="silu",
+        double_z=True,
+        dtype="float16",
+    ):
+        super().__init__()
+        self.layers_per_block = layers_per_block
+        print(in_channels, block_out_channels[0])
+        self.conv_in = nn.Conv2dBiasFewChannels(
+            in_channels,
+            block_out_channels[0],
+            kernel_size=3,
+            stride=1,
+            padding=1, dtype=dtype
+        )
+
+        self.mid_block = None
+        self.down_blocks = nn.ModuleList([])
+
+        # down
+        output_channel = block_out_channels[0]
+        for i, down_block_type in enumerate(down_block_types):
+            input_channel = output_channel
+            output_channel = block_out_channels[i]
+            is_final_block = i == len(block_out_channels) - 1
+
+            down_block = get_down_block(
+                down_block_type,
+                num_layers=self.layers_per_block,
+                in_channels=input_channel,
+                out_channels=output_channel,
+                add_downsample=not is_final_block,
+                resnet_eps=1e-6,
+                downsample_padding=0,
+                resnet_act_fn=act_fn,
+                resnet_groups=norm_num_groups,
+                attn_num_head_channels=None,
+                temb_channels=None,
+                dtype=dtype,
+            )
+            self.down_blocks.append(down_block)
+
+        # mid
+        self.mid_block = UNetMidBlock2D(
+            batch_size,
+            height,
+            width,
+            in_channels=block_out_channels[-1],
+            resnet_eps=1e-6,
+            resnet_act_fn=act_fn,
+            output_scale_factor=1,
+            resnet_time_scale_shift="default",
+            attn_num_head_channels=None,
+            resnet_groups=norm_num_groups,
+            temb_channels=None,
+            dtype=dtype,
+        )
+
+        # out
+        self.conv_norm_out = nn.GroupNorm(num_channels=block_out_channels[-1], num_groups=norm_num_groups, eps=1e-6, dtype=dtype)
+        self.conv_act = ops.silu
+
+        conv_out_channels = 2 * out_channels if double_z else out_channels
+        self.conv_out = nn.Conv2dBias(block_out_channels[-1], conv_out_channels, kernel_size=3, stride=1, padding=1, dtype=dtype)
+
+    def forward(self, x):
+        sample = x
+        
+        sample = self.conv_in(sample)
+
+        for down_block in self.down_blocks:
+            sample = down_block(sample)
+
+        # middle
+        sample = self.mid_block(sample)
+
+        # post-process
+        sample = self.conv_norm_out(sample)
+        sample = self.conv_act(sample)
+        sample = self.conv_out(sample)
+
+        return sample
+
+
+# class DiagonalGaussianDistribution(object):
+#     def __init__(self, parameters: Tensor, deterministic=False):
+#         self.parameters = parameters
+#         print(parameters.shape())
+#         self.mean, self.logvar = ops.chunk()(parameters, 2, dim=3)
+#         self.logvar = ops.clamp()(self.logvar, -30.0, 20.0)
+#         self.deterministic = deterministic
+#         self.std = ops.exp(0.5 * self.logvar)
+#         self.var = ops.exp(self.logvar)
+#         if self.deterministic:
+#             self.var = self.std = Tensor(self.mean.shape(), value=0.0, dtype=self.parameters._attrs["dtype"])
+
+#     def sample(self, sample):
+#         x = self.mean + self.std * sample
+#         return x
+
+#     def kl(self, other=None):
+#         if self.deterministic:
+#             return Tensor(shape=[], value=0.0, dtype=self.parameters._attrs["dtype"])
+#         else:
+#             raise NotImplementedError("KL not implemented for DiagonalGaussianDistribution")
+#             """
+#             `torch.sum` in AIT graph?
+#             """
+#             if other is None:
+#                 return 0.5 * torch.sum(ops.pow(self.mean, 2) + self.var - 1.0 - self.logvar, dim=[1, 2, 3])
+#             else:
+#                 return 0.5 * torch.sum(
+#                     ops.pow(self.mean - other.mean, 2) / other.var
+#                     + self.var / other.var
+#                     - 1.0
+#                     - self.logvar
+#                     + other.logvar,
+#                     dim=[1, 2, 3],
+#                 )
+
+#     def nll(self, sample, dims=[1, 2, 3]):
+#         if self.deterministic:
+#             return Tensor(shape=[], value=0.0, dtype=self.parameters._attrs["dtype"])
+#         raise NotImplementedError("NLL not implemented for DiagonalGaussianDistribution")
+#         """
+#         `torch.sum` in AIT graph?
+#         """
+#         np_pi = 3.141592653589793 # from print(np.pi)
+#         logtwopi = ops.log(2.0 * np_pi)
+#         return 0.5 * torch.sum(logtwopi + self.logvar + ops.pow(sample - self.mean, 2) / self.var, dim=dims)
+
+#     def mode(self):
+#         return self.mean
+
+
+
 class AutoencoderKL(nn.Module):
     def __init__(
         self,
@@ -129,6 +277,7 @@ class AutoencoderKL(nn.Module):
         layers_per_block: int = 1,
         act_fn: str = "silu",
         latent_channels: int = 4,
+        norm_num_groups: int = 32,
         sample_size: int = 32,
         dtype="float16"
     ):
@@ -149,10 +298,30 @@ class AutoencoderKL(nn.Module):
             latent_channels, latent_channels, kernel_size=1, stride=1, padding=0, dtype=dtype
         )
 
+        self.encoder = Encoder(
+            batch_size,
+            height,
+            width,
+            in_channels=in_channels,
+            out_channels=latent_channels,
+            down_block_types=down_block_types,
+            block_out_channels=block_out_channels,
+            layers_per_block=layers_per_block,
+            act_fn=act_fn,
+            norm_num_groups=norm_num_groups,
+            double_z=True,
+        )
+        self.quant_conv = nn.Conv2dBias(
+            2 * latent_channels, 2 * latent_channels, kernel_size=1, stride=1, padding=0, dtype=dtype
+        )
+
     def decode(self, z: Tensor, return_dict: bool = True):
         z = self.post_quant_conv(z)
         dec = self.decoder(z)
         return dec
 
-    def forward(self):
-        raise NotImplementedError("Only decode() is implemented for AutoencoderKL!")
+    def encode(self, x: Tensor, return_dict: bool = True, deterministic: bool = False):
+        h = self.encoder(x)
+        moments = self.quant_conv(h)
+        return moments
+

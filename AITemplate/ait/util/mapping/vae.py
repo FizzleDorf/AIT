@@ -1,16 +1,18 @@
 import torch
 from ...util import torch_dtype_from_str
 
-def map_vae(pt_module, device="cuda", dtype="float16"):
+def map_vae(pt_module, device="cuda", dtype="float16", encoder=False):
     if not isinstance(pt_module, dict):
         pt_params = dict(pt_module.named_parameters())
     else:
         pt_params = pt_module
     params_ait = {}
+    quant_key = "post_quant" if encoder else "quant"
+    vae_key = "decoder" if encoder else "encoder"
     for key, arr in pt_params.items():
-        if key.startswith("encoder"):
+        if key.startswith(vae_key):
             continue
-        if key.startswith("quant"):
+        if key.startswith(quant_key):
             continue
         arr = arr.to(device, dtype=torch_dtype_from_str(dtype))
         key = key.replace(".", "_")
@@ -87,5 +89,11 @@ def map_vae(pt_module, device="cuda", dtype="float16"):
             params_ait[key] = arr
         else:
             params_ait[key] = arr
+    if encoder:
+        print(params_ait["encoder_conv_in_weight"].shape)
+        params_ait["encoder_conv_in_weight"] = torch.functional.F.pad(
+            params_ait["encoder_conv_in_weight"], (0, 1, 0, 0, 0, 0, 0, 0)
+        )
+        print(params_ait["encoder_conv_in_weight"].shape)
 
     return params_ait

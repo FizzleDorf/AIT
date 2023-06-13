@@ -5,6 +5,7 @@ import comfy.sample
 import comfy.utils
 import comfy.sd
 import comfy.k_diffusion.external as k_diffusion_external
+from comfy.ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 import torch
 import contextlib
 import sys
@@ -291,6 +292,54 @@ class AITemplateLoader:
         aitemplate_path = get_full_path("aitemplate", aitemplate_module)
         AITemplate.modules["unet"] = AITemplate.loader.load(aitemplate_path)
         return ((model,keep_loaded,aitemplate_path),)
+
+
+
+class AITemplateVAEEncode:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { 
+            "pixels": ("IMAGE", ),
+            "vae": ("VAE", ),
+            "aitemplate_module": (get_filename_list("aitemplate"), ),
+            "keep_loaded": (["enable", "disable"], ),
+        }}
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "encode"
+
+    CATEGORY = "latent"
+
+    @staticmethod
+    def vae_encode_crop_pixels(pixels):
+        x = (pixels.shape[1] // 8) * 8
+        y = (pixels.shape[2] // 8) * 8
+        if pixels.shape[1] != x or pixels.shape[2] != y:
+            x_offset = (pixels.shape[1] % 8) // 2
+            y_offset = (pixels.shape[2] % 8) // 2
+            pixels = pixels[:, x_offset:x + x_offset, y_offset:y + y_offset, :]
+        return pixels
+
+    def encode(self, vae, pixels, aitemplate_module, keep_loaded):
+        global AITemplate
+        if "vae_encode" not in AITemplate.modules:
+            aitemplate_path = get_full_path("aitemplate", aitemplate_module)
+            AITemplate.modules["vae_encode"] = AITemplate.loader.load(aitemplate_path)
+            AITemplate.modules["vae_encode"] = AITemplate.loader.apply_vae(
+                aitemplate_module=AITemplate.modules["vae_encode"],
+                vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
+                encoder=True,
+            )
+        pixels = self.vae_encode_crop_pixels(pixels)
+        pixels = pixels[:,:,:,:3]
+        pixels = pixels.movedim(-1, 1)
+        pixels = 2. * pixels - 1.
+        moments = vae_inference(AITemplate.modules["vae_encode"], pixels, encoder=True)
+        posterior = DiagonalGaussianDistribution(moments)
+        samples = posterior.sample() * vae.scale_factor
+        if keep_loaded == "disable":
+            AITemplate.modules.pop("vae_encode")
+            torch.cuda.empty_cache()
+        return ({"samples":samples}, )
 
 
 class AITemplateVAEDecode:

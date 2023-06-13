@@ -34,6 +34,10 @@ class AIT:
             self.modules["vae"] = self.loader.load(aitemplate_path)
             vae = self.loader.diffusers_vae(hf_hub_or_path)
             self.modules["vae"] = self.loader.apply_vae(self.modules["vae"], vae)
+        elif module_type == "vae_encode":
+            self.modules["vae_encode"] = self.loader.load(aitemplate_path)
+            vae = self.loader.diffusers_vae(hf_hub_or_path)
+            self.modules["vae_encode"] = self.loader.apply_vae(self.modules["vae_encode"], vae, encoder=True)
         else:
             raise ValueError(f"module_type must be one of {self.supported}")
 
@@ -71,6 +75,10 @@ class AIT:
             self.modules["vae"] = self.loader.load(aitemplate_path)
             vae = self.loader.compvis_vae(state_dict)
             self.modules["vae"] = self.loader.apply_vae(self.modules["vae"], vae)
+        elif module_type == "vae_encode":
+            self.modules["vae_encode"] = self.loader.load(aitemplate_path)
+            vae = self.loader.compvis_vae(state_dict)
+            self.modules["vae_encode"] = self.loader.apply_vae(self.modules["vae_encode"], vae, encoder=True)
         else:
             raise ValueError(f"module_type must be one of {self.supported}")
 
@@ -103,6 +111,29 @@ class AIT:
         )
         print(output.shape)
         return output
+
+    def test_vae_encode(
+        self,
+        batch_size: int = 1,
+        channels: int = 3,
+        height: int = 512,
+        width: int = 512,
+        dtype="float16",
+        device="cuda",
+    ):
+        if "vae_encode" not in self.modules:
+            raise ValueError("vae module not loaded")
+        vae_input = torch.randn(batch_size, channels, height, width).to(device)
+        if dtype == "float16":
+            vae_input = vae_input.half()
+        output = vae_inference(
+            self.modules["vae_encode"],
+            vae_input=vae_input,
+            encoder=True,
+        )
+        print(output.shape)
+        return output
+
 
     def test_vae(
         self,

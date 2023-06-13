@@ -55,6 +55,7 @@ def compile_vae(
     down_factor=8,
     dtype="float16",
     work_dir="./tmp",
+    vae_encode=True,
 ):
     ait_vae = ait_AutoencoderKL(
         batch_size[0],
@@ -73,9 +74,9 @@ def compile_vae(
     )
 
     static_shape = batch_size[0] == batch_size[1] and height[0] == height[1] and width[0] == width[1]
-
-    height = height[0] // down_factor, height[1] // down_factor
-    width = width[0] // down_factor, width[1] // down_factor
+    if not vae_encode:
+        height = height[0] // down_factor, height[1] // down_factor
+        width = width[0] // down_factor, width[1] // down_factor
 
     if static_shape:
         batch_size = batch_size[0]
@@ -87,7 +88,7 @@ def compile_vae(
         width_d = IntVar(values=list(width), name="width")
 
     ait_input = Tensor(
-        shape=[batch_size, height_d, width_d, latent_channels],
+        shape=[batch_size, height_d, width_d, 3 if vae_encode else latent_channels],
         name="vae_input",
         is_input=True,
         dtype=dtype
@@ -95,9 +96,11 @@ def compile_vae(
     ait_vae.name_parameter_tensor()
 
     pt_mod = pt_mod.eval()
-    params_ait = map_vae(pt_mod, dtype=dtype)
-
-    Y = ait_vae.decode(ait_input)
+    params_ait = map_vae(pt_mod, dtype=dtype, encoder=vae_encode)
+    if vae_encode:
+        Y = ait_vae.encode(ait_input)
+    else:
+        Y = ait_vae.decode(ait_input)
     mark_output(Y)
     target = detect_target(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm

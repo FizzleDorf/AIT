@@ -5,7 +5,7 @@ Experimental usage of [AITemplate](https://github.com/facebookincubator/AITempla
 Also functions as a ComfyUI custom node
 * Drop `AITemplate` folder in `ComfyUI/custom_nodes/`
 * Put modules in `AITemplate/modules/`
-* Supports UNet, ControlNet and VAE
+* Supports UNet, ControlNet, VAE and **VAE encode**
 
 [Pre-compiled modules](https://huggingface.co/datasets/hlky/aitemplate)
 
@@ -22,6 +22,7 @@ Also functions as a ComfyUI custom node
 * CLIPTextModel
 * UNet
 * VAE
+* **VAE encode**
 
 ### WIP Experiments soon:tm:
 * x4-upscaler (VAE works)

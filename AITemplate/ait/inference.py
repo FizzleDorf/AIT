@@ -134,6 +134,7 @@ def vae_inference(
     factor: int = 8,
     device: str = "cuda",
     dtype: str = "float16",
+    encoder: bool = False,
 ):
     batch = vae_input.shape[0]
     height, width = vae_input.shape[2], vae_input.shape[3]
@@ -150,8 +151,12 @@ def vae_inference(
     for i in range(num_outputs):
         shape = exe_module.get_output_maximum_shape(i)
         shape[0] = batch
-        shape[1] = height * factor
-        shape[2] = width * factor
+        if encoder:
+            shape[1] = height // factor
+            shape[2] = width // factor
+        else:
+            shape[1] = height * factor
+            shape[2] = width * factor
         ys.append(torch.empty(shape).to(device))
         if dtype == "float16":
             ys[i] = ys[i].half()

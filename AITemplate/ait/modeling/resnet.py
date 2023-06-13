@@ -84,7 +84,7 @@ class Downsample2D(nn.Module):
     """
 
     def __init__(
-        self, channels, use_conv=False, out_channels=None, padding=1, name="conv"
+        self, channels, use_conv=False, out_channels=None, padding=1, name="conv", dtype="float16"
     ):
         super().__init__()
         self.channels = channels
@@ -96,7 +96,7 @@ class Downsample2D(nn.Module):
 
         if use_conv:
             conv = nn.Conv2dBias(
-                self.channels, self.out_channels, 3, stride=stride, padding=padding
+                self.channels, self.out_channels, 3, stride=stride, dtype=dtype, padding=1
             )
         else:
             assert self.channels == self.out_channels
