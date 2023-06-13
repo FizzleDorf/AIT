@@ -171,8 +171,12 @@ comfy.sample.sample = sample
 
 
 class ControlNet:
-    def __init__(self, control_model, device=None):
-        self.aitemplate = None
+    def __init__(self, control_model, global_average_pooling=False, device=None):
+        global AITemplate
+        if "controlnet" in AITemplate.modules:
+            self.aitemplate = True
+        else:
+            self.aitemplate = None
         self.control_model = control_model
         self.cond_hint_original = None
         self.cond_hint = None
@@ -181,14 +185,16 @@ class ControlNet:
             device = comfy.model_management.get_torch_device()
         self.device = device
         self.previous_controlnet = None
+        self.global_average_pooling = global_average_pooling
 
     def aitemplate_controlnet(
         self, latent_model_input, timesteps, encoder_hidden_states, controlnet_cond
     ):
+        global AITemplate
         if self.aitemplate is None:
             raise RuntimeError("No aitemplate loaded")
         return controlnet_inference(
-            exe_module=self.aitemplate,
+            exe_module=AITemplate.modules["controlnet"],
             latent_model_input=latent_model_input,
             timesteps=timesteps,
             encoder_hidden_states=encoder_hidden_states,
@@ -231,6 +237,9 @@ class ControlNet:
                 key = 'output'
                 index = i
             x = control[i]
+            if self.global_average_pooling:
+                x = torch.mean(x, dim=(2, 3), keepdim=True).repeat(1, 1, x.shape[2], x.shape[3])
+
             x *= self.strength
             if x.dtype != output_dtype and not autocast_enabled:
                 x = x.to(output_dtype)
@@ -336,6 +345,7 @@ class AITemplateVAEEncode:
         moments = vae_inference(AITemplate.modules["vae_encode"], pixels, encoder=True)
         posterior = DiagonalGaussianDistribution(moments)
         samples = posterior.sample() * vae.scale_factor
+        samples = samples.cpu()
         if keep_loaded == "disable":
             AITemplate.modules.pop("vae_encode")
             torch.cuda.empty_cache()
@@ -386,12 +396,12 @@ class AITemplateControlNetLoader:
     CATEGORY = "loaders"
 
     def load_aitemplate_controlnet(self, control_net, aitemplate_module):
+        global AITemplate
         aitemplate_path = get_full_path("aitemplate", aitemplate_module)
-        aitemplate = AITemplate.loader.load(aitemplate_path)
-        aitemplate = AITemplate.loader.apply_controlnet(
-            aitemplate_module=aitemplate,
+        AITemplate.modules["controlnet"] = AITemplate.loader.load(aitemplate_path)
+        AITemplate.modules["controlnet"] = AITemplate.loader.apply_controlnet(
+            aitemplate_module=AITemplate.modules["controlnet"],
             controlnet=AITemplate.loader.compvis_controlnet(control_net.control_model.state_dict())
         )
-        control_net.aitemplate = aitemplate
         return (control_net,)
 

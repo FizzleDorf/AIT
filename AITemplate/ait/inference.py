@@ -102,7 +102,10 @@ def controlnet_inference(
     device: str = "cuda",
     dtype: str = "float16",
 ):
-    timesteps_pt = timesteps
+    timesteps_pt = timesteps.expand(2)
+    latent_model_input = latent_model_input.expand(2, -1, -1, -1)
+    controlnet_cond = controlnet_cond.expand(2, -1, -1, -1)
+    encoder_hidden_states = encoder_hidden_states[0]
     inputs = {
         "input0": latent_model_input.permute((0, 2, 3, 1))
         .contiguous()
@@ -111,6 +114,8 @@ def controlnet_inference(
         "input2": encoder_hidden_states.to(device),
         "input3": controlnet_cond.permute((0, 2, 3, 1)).contiguous().to(device),
     }
+    for k, v in inputs.items():
+        print(k, v.shape)
     if dtype == "float16":
         for k, v in inputs.items():
             inputs[k] = v.half()
@@ -122,9 +127,10 @@ def controlnet_inference(
         if dtype == "float16":
             ys[i] = ys[i].half()
     exe_module.run_with_tensors(inputs, ys, graph_mode=False)
-    down_block_residuals = (y for y in ys[:-1])
-    mid_block_residual = ys[-1]
-    return down_block_residuals, mid_block_residual
+    ys = [y.permute((0, 3, 1, 2)).float() for y in ys]
+    # down_block_residuals = [y for y in ys[:-1]]
+    # mid_block_residual = ys[-1]
+    return ys
 
 
 

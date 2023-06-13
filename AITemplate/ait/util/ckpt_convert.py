@@ -151,7 +151,7 @@ def convert_ldm_unet_checkpoint(unet_state_dict, layers_per_block=2, controlnet=
     """
     temp = {}
     if controlnet:
-        unet_key = "control_model."
+        unet_keys = ["control_model."]
     else:
         unet_keys = ["model.diffusion_model.", "diffusion_model."]
 
