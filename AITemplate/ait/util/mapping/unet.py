@@ -28,14 +28,16 @@ def map_unet(pt_mod, in_channels=None, conv_in_key=None, dim=320, device="cuda",
         params_ait[key.replace(".", "_")] = arr
 
     if conv_in_key is not None:
-        if in_channels >= 1 and in_channels < 4:
+        if in_channels > 0 and in_channels < 4:
             pad_by = 4 - in_channels
         elif in_channels > 4 and in_channels < 8:
             pad_by = 8 - in_channels
+        elif in_channels > 8 and in_channels < 12:
+            pad_by = 12 - in_channels
         else:
             pad_by = 0
-        params_ait[conv_in_key] = torch.nn.functional.pad(
-            params_ait[conv_in_key], (pad_by, 0, 0, 0)
+        params_ait[conv_in_key] = torch.functional.F.pad(
+            params_ait[conv_in_key], (0, pad_by, 0, 0, 0, 0, 0, 0)
         )
 
     params_ait["arange"] = (

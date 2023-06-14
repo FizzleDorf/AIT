@@ -132,7 +132,9 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         if apply_aitemplate_weights:
             AITemplate.modules["unet"] = AITemplate.loader.apply_unet(
                 aitemplate_module=AITemplate.modules["unet"],
-                unet=AITemplate.loader.compvis_unet(real_model.state_dict())
+                unet=AITemplate.loader.compvis_unet(real_model.state_dict()),
+                in_channels=real_model.diffusion_model.in_channels,
+                conv_in_key="conv_in_weight",
             )
 
     noise = noise.to(device)

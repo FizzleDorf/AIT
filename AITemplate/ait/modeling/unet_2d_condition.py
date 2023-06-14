@@ -105,6 +105,8 @@ class UNet2DConditionModel(nn.Module):
             in_channels = 4
         elif in_channels > 4 and in_channels <= 8:
             in_channels = 8
+        elif in_channels > 8 and in_channels <= 12:
+            in_channels = 12
         conv_in_padding = (conv_in_kernel - 1) // 2
         self.conv_in = nn.Conv2dBias(in_channels, block_out_channels[0], 3, 1, conv_in_padding)
         # time
@@ -243,12 +245,14 @@ class UNet2DConditionModel(nn.Module):
             class_emb = ops.batch_gather()(self.class_embedding.weight.tensor(), class_labels)
             emb = emb + class_emb
         # 2. pre-process
-        if self.in_channels > 4 and self.in_channels < 9:
-            sample = ops.pad_last_dim(4, 8)(sample)
-        elif self.in_channels >= 1 and self.in_channels < 4:
+        if self.in_channels < 4:
             sample = ops.pad_last_dim(4, 4)(sample)
+        elif self.in_channels > 4 and self.in_channels < 8:
+            sample = ops.pad_last_dim(4, 8)(sample)
+        elif self.in_channels > 8 and self.in_channels < 12:
+            sample = ops.pad_last_dim(4, 12)(sample)
         else:
-            sample = sample # may raise error if >= 9
+            sample = sample
         sample = self.conv_in(sample)
 
         # 3. down

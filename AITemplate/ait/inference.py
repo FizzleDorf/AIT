@@ -29,12 +29,10 @@ class AITemplateModelWrapper(torch.nn.Module):
         encoder_hidden_states = None
         down_block_residuals = None
         mid_block_residual = None
-        #TODO: verify this is correct/match DiffusionWrapper (ddpm.py)
         if c_crossattn is not None:
-            encoder_hidden_states = c_crossattn
-            encoder_hidden_states = encoder_hidden_states[0]
+            encoder_hidden_states = torch.cat(c_crossattn, dim=1)
         if c_concat is not None:
-            encoder_hidden_states = c_concat
+            latent_model_input = torch.cat([x] + c_concat, dim=1)
         if control is not None:
             down_block_residuals = control["output"]
             mid_block_residual = control["middle"][0]

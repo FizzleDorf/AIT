@@ -99,7 +99,7 @@ def compile_unet(
 
     # set AIT parameters
     pt_mod = pt_mod.eval()
-    params_ait = map_unet(pt_mod, dim=dim)
+    params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight")
 
     static_shape = (width[0] == width[1] and height[0] == height[1] and batch_size[0] == batch_size[1]) or controlnet
 
