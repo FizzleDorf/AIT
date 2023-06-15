@@ -38,7 +38,6 @@ def compile_unet(
     use_fp16_acc=False,
     convert_conv_to_gemm=False,
     controlnet=False,
-    x4_upscaler=False,
     attention_head_dim=[5, 10, 20, 20],  # noqa: B006
     model_name="UNet2DConditionModel",
     use_linear_projection=False,
@@ -133,7 +132,8 @@ def compile_unet(
     )
 
     class_labels = None
-    if x4_upscaler:
+    #TODO: better way to handle this, enables class_labels for x4-upscaler
+    if in_channels == 7:
         class_labels = Tensor(
             [batch_size], name="input3", dtype="int64", is_input=True
         )

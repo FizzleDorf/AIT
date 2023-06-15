@@ -58,6 +58,12 @@ from ait.compile.unet import compile_unet
     default=None,
     help="include constants (model weights) with compiled model",
 )
+@click.option(
+    "--down-factor",
+    default=8,
+    type=int,
+    help="Down factor, this is 4 for x4-upscaler",
+)
 @click.option("--use-fp16-acc", default=True, help="use fp16 accumulation")
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
 @click.option("--controlnet", default=False, help="UNet for controlnet")
@@ -70,6 +76,7 @@ def compile_diffusers(
     batch_size,
     clip_chunks,
     include_constants,
+    down_factor=8,
     use_fp16_acc=True,
     convert_conv_to_gemm=True,
     controlnet=False,
@@ -119,6 +126,7 @@ def compile_diffusers(
        controlnet=True if controlnet else False,
        model_name=model_name,
        work_dir=work_dir,
+       down_factor=down_factor,
     )
 
 if __name__ == "__main__":
