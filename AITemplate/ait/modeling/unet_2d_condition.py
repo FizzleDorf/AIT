@@ -93,6 +93,7 @@ class UNet2DConditionModel(nn.Module):
             False
         ],
         conv_in_kernel = 3,
+        dtype="float16",
     ):
         super().__init__()
         self.center_input_sample = center_input_sample
@@ -108,19 +109,19 @@ class UNet2DConditionModel(nn.Module):
         elif in_channels > 8 and in_channels <= 12:
             in_channels = 12
         conv_in_padding = (conv_in_kernel - 1) // 2
-        self.conv_in = nn.Conv2dBias(in_channels, block_out_channels[0], 3, 1, conv_in_padding)
+        self.conv_in = nn.Conv2dBias(in_channels, block_out_channels[0], 3, 1, conv_in_padding, dtype=dtype)
         # time
-        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos, freq_shift)
+        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos, freq_shift, dtype=dtype)
         timestep_input_dim = block_out_channels[0]
 
-        self.time_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim)
+        self.time_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim, dtype=dtype)
         self.class_embed_type = class_embed_type
         if class_embed_type is None and num_class_embeds is not None:
-            self.class_embedding = nn.Embedding([num_class_embeds, time_embed_dim], "float16")
+            self.class_embedding = nn.Embedding([num_class_embeds, time_embed_dim], dtype=dtype)
         elif class_embed_type == "timestep":
-            self.class_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim)
+            self.class_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim, dtype=dtype)
         elif class_embed_type == "identity":
-            self.class_embedding = nn.Identity(time_embed_dim, time_embed_dim)
+            self.class_embedding = nn.Identity(dtype=dtype)
         else:
             self.class_embedding = None
         self.down_blocks = nn.ModuleList([])
@@ -148,7 +149,8 @@ class UNet2DConditionModel(nn.Module):
                 cross_attention_dim=cross_attention_dim,
                 downsample_padding=downsample_padding,
                 use_linear_projection=use_linear_projection,
-                only_cross_attention=only_cross_attention[i]
+                only_cross_attention=only_cross_attention[i],
+                dtype=dtype,
             )
             self.down_blocks.append(down_block)
 
@@ -164,6 +166,7 @@ class UNet2DConditionModel(nn.Module):
             attn_num_head_channels=attention_head_dim[-1],
             resnet_groups=norm_num_groups,
             use_linear_projection=use_linear_projection,
+            dtype=dtype,
         )
 
         # up
@@ -192,7 +195,8 @@ class UNet2DConditionModel(nn.Module):
                 attn_num_head_channels=reversed_attention_head_dim[i],
                 cross_attention_dim=cross_attention_dim,
                 use_linear_projection=use_linear_projection,
-                only_cross_attention=only_cross_attention[i]
+                only_cross_attention=only_cross_attention[i],
+                dtype=dtype,
             )
             self.up_blocks.append(up_block)
             prev_output_channel = output_channel
@@ -203,9 +207,10 @@ class UNet2DConditionModel(nn.Module):
             num_groups=norm_num_groups,
             eps=norm_eps,
             use_swish=True,
+            dtype=dtype,
         )
 
-        self.conv_out = nn.Conv2dBias(block_out_channels[0], out_channels, 3, 1, 1)
+        self.conv_out = nn.Conv2dBias(block_out_channels[0], out_channels, 3, 1, 1, dtype=dtype)
 
     def forward(
         self,

@@ -157,7 +157,7 @@ class BasicTransformerBlock(nn.Module):
             dropout=dropout,
             dtype=dtype
         )
-        self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
+        self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff, dtype=dtype)
         if context_dim is not None:
             self.attn2 = CrossAttention(
             query_dim=dim,
@@ -169,9 +169,9 @@ class BasicTransformerBlock(nn.Module):
         )
         else:
             self.attn2 = None
-        self.norm1 = nn.LayerNorm(dim)
-        self.norm2 = nn.LayerNorm(dim)
-        self.norm3 = nn.LayerNorm(dim)
+        self.norm1 = nn.LayerNorm(dim, dtype=dtype)
+        self.norm2 = nn.LayerNorm(dim, dtype=dtype)
+        self.norm3 = nn.LayerNorm(dim, dtype=dtype)
         self.checkpoint = checkpoint
 
         self.param = (dim, n_heads, d_head, context_dim, gated_ff, checkpoint)

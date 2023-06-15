@@ -64,6 +64,7 @@ from ait.compile.unet import compile_unet
     type=int,
     help="Down factor, this is 4 for x4-upscaler",
 )
+@click.option("--fp32", default=False, help="use fp32")
 @click.option("--use-fp16-acc", default=True, help="use fp16 accumulation")
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
 @click.option("--controlnet", default=False, help="UNet for controlnet")
@@ -77,6 +78,7 @@ def compile_diffusers(
     clip_chunks,
     include_constants,
     down_factor=8,
+    fp32=False,
     use_fp16_acc=True,
     convert_conv_to_gemm=True,
     controlnet=False,
@@ -121,12 +123,14 @@ def compile_diffusers(
        class_embed_type=pipe.config.class_embed_type,
        num_class_embeds=pipe.config.num_class_embeds,
        only_cross_attention=pipe.config.only_cross_attention,
+       sample_size=pipe.config.sample_size,
        dim=pipe.config.block_out_channels[0],
        constants=True if include_constants else False,
        controlnet=True if controlnet else False,
        model_name=model_name,
        work_dir=work_dir,
        down_factor=down_factor,
+       dtype="float32" if fp32 else "float16",
     )
 
 if __name__ == "__main__":

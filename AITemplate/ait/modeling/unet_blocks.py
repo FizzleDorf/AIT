@@ -141,6 +141,7 @@ def get_down_block(
         output_scale_factor=1.0,
         add_downsample=add_downsample,
         downsample_padding=downsample_padding,
+        dtype=dtype,
         )
 
 
@@ -260,6 +261,7 @@ class UNetMidBlock2DCrossAttn(nn.Module):
         output_scale_factor=1.0,
         cross_attention_dim=1280,
         use_linear_projection=False,
+        dtype="float16",
         **kwargs,
     ):
         super().__init__()
@@ -283,6 +285,7 @@ class UNetMidBlock2DCrossAttn(nn.Module):
                 non_linearity=resnet_act_fn,
                 output_scale_factor=output_scale_factor,
                 pre_norm=resnet_pre_norm,
+                dtype=dtype,
             )
         ]
         attentions = []
@@ -296,6 +299,7 @@ class UNetMidBlock2DCrossAttn(nn.Module):
                     depth=1,
                     context_dim=cross_attention_dim,
                     use_linear_projection=use_linear_projection,
+                    dtype=dtype,
                 )
             )
             resnets.append(
@@ -310,6 +314,7 @@ class UNetMidBlock2DCrossAttn(nn.Module):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
+                    dtype=dtype,
                 )
             )
 

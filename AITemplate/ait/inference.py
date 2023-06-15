@@ -59,7 +59,7 @@ def unet_inference(
 ):
     batch = latent_model_input.shape[0]
     height, width = latent_model_input.shape[2], latent_model_input.shape[3]
-    timesteps_pt = timesteps
+    timesteps_pt = timesteps.expand(batch)
     inputs = {
         "input0": latent_model_input.permute((0, 2, 3, 1))
         .contiguous()

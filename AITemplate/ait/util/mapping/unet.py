@@ -41,7 +41,7 @@ def map_unet(pt_mod, in_channels=None, conv_in_key=None, dim=320, device="cuda",
         )
 
     params_ait["arange"] = (
-        torch.arange(start=0, end=dim // 2, dtype=torch.float32).cuda().half()
+        torch.arange(start=0, end=dim // 2, dtype=torch.float32).to(device, dtype=torch_dtype_from_str(dtype))
     )
 
     return params_ait

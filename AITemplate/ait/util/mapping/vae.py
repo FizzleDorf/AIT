@@ -90,10 +90,8 @@ def map_vae(pt_module, device="cuda", dtype="float16", encoder=False):
         else:
             params_ait[key] = arr
     if encoder:
-        print(params_ait["encoder_conv_in_weight"].shape)
         params_ait["encoder_conv_in_weight"] = torch.functional.F.pad(
             params_ait["encoder_conv_in_weight"], (0, 1, 0, 0, 0, 0, 0, 0)
         )
-        print(params_ait["encoder_conv_in_weight"].shape)
 
     return params_ait

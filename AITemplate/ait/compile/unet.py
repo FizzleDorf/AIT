@@ -67,6 +67,7 @@ def compile_unet(
         False
     ],
     down_factor=8,
+    dtype="float16",
 ):
     if isinstance(only_cross_attention, bool):
         only_cross_attention = [only_cross_attention] * len(block_out_channels)
@@ -93,12 +94,13 @@ def compile_unet(
             class_embed_type=class_embed_type,
             num_class_embeds=num_class_embeds,
             only_cross_attention=only_cross_attention,
+            dtype=dtype,
         )
     ait_mod.name_parameter_tensor()
 
     # set AIT parameters
     pt_mod = pt_mod.eval()
-    params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight")
+    params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight", dtype=dtype)
 
     static_shape = (width[0] == width[1] and height[0] == height[1] and batch_size[0] == batch_size[1]) or controlnet
 
@@ -124,11 +126,11 @@ def compile_unet(
         
 
     latent_model_input_ait = Tensor(
-        [batch_size, height_d, width_d, in_channels], name="input0", is_input=True
+        [batch_size, height_d, width_d, in_channels], name="input0", is_input=True, dtype=dtype
     )
-    timesteps_ait = Tensor([batch_size], name="input1", is_input=True)
+    timesteps_ait = Tensor([batch_size], name="input1", is_input=True, dtype=dtype)
     text_embeddings_pt_ait = Tensor(
-        [batch_size, embedding_size, hidden_dim], name="input2", is_input=True
+        [batch_size, embedding_size, hidden_dim], name="input2", is_input=True, dtype=dtype
     )
 
     class_labels = None

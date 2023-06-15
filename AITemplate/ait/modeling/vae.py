@@ -140,7 +140,8 @@ class Encoder(nn.Module):
             block_out_channels[0],
             kernel_size=3,
             stride=1,
-            padding=1, dtype=dtype
+            padding=1,
+            dtype=dtype,
         )
 
         self.mid_block = None
@@ -310,6 +311,7 @@ class AutoencoderKL(nn.Module):
             act_fn=act_fn,
             norm_num_groups=norm_num_groups,
             double_z=True,
+            dtype=dtype,
         )
         self.quant_conv = nn.Conv2dBias(
             2 * latent_channels, 2 * latent_channels, kernel_size=1, stride=1, padding=0, dtype=dtype
