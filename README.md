@@ -6,6 +6,7 @@ Also functions as a ComfyUI custom node
 * Drop `AITemplate` folder in `ComfyUI/custom_nodes/`
 * Put modules in `AITemplate/modules/`
 * Supports UNet, **Inpainting UNet**, ControlNet, VAE and **VAE encode**
+* **ControlNet now supports dynamic shape**
 
 [Pre-compiled modules](https://huggingface.co/datasets/hlky/aitemplate)
 

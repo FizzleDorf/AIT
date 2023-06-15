@@ -1,8 +1,7 @@
 # UNet
 
 ## Limitations
-* Control UNet only supports static shape.
-* Models with odd input channels (Inpaint, x4-upscaler etc.) are experimental.
+* Models with odd input channels (x4-upscaler etc.) are experimental.
 
 ## Inference
 

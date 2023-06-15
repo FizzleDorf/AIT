@@ -217,10 +217,20 @@ class UNet2DConditionModel(nn.Module):
         sample,
         timesteps,
         encoder_hidden_states,
+        down_block_residual_0 = None,
+        down_block_residual_1 = None,
+        down_block_residual_2 = None,
+        down_block_residual_3 = None,
+        down_block_residual_4 = None,
+        down_block_residual_5 = None,
+        down_block_residual_6 = None,
+        down_block_residual_7 = None,
+        down_block_residual_8 = None,
+        down_block_residual_9 = None,
+        down_block_residual_10 = None,
+        down_block_residual_11 = None,
+        mid_block_residual = None,
         class_labels: Optional[Tensor] = None,
-        down_block_additional_residuals: Optional[Tuple[Tensor]] = None,
-        mid_block_additional_residual: Optional[Tensor] = None,
-        
         return_dict: bool = True,
     ):
         """r
@@ -236,6 +246,23 @@ class UNet2DConditionModel(nn.Module):
             [`~models.unet_2d_condition.UNet2DConditionOutput`] if `return_dict` is True, otherwise a `tuple`. When
             returning a tuple, the first element is the sample tensor.
         """
+        down_block_additional_residuals = (
+            down_block_residual_0,
+            down_block_residual_1,
+            down_block_residual_2,
+            down_block_residual_3,
+            down_block_residual_4,
+            down_block_residual_5,
+            down_block_residual_6,
+            down_block_residual_7,
+            down_block_residual_8,
+            down_block_residual_9,
+            down_block_residual_10,
+            down_block_residual_11,
+        )
+        mid_block_additional_residual = mid_block_residual
+        if down_block_additional_residuals[0] is None:
+            down_block_additional_residuals = None
 
         # 1. time
         t_emb = self.time_proj(timesteps)
@@ -284,6 +311,7 @@ class UNet2DConditionModel(nn.Module):
             for down_block_res_sample, down_block_additional_residual in zip(
                 down_block_res_samples, down_block_additional_residuals
             ):
+                down_block_additional_residual._attrs["shape"] = down_block_res_sample._attrs["shape"]
                 down_block_res_sample += down_block_additional_residual
                 new_down_block_res_samples += (down_block_res_sample,)
 
@@ -295,6 +323,7 @@ class UNet2DConditionModel(nn.Module):
         )
 
         if mid_block_additional_residual is not None:
+            mid_block_additional_residual._attrs["shape"] = sample._attrs["shape"]
             sample += mid_block_additional_residual
 
         # 5. up

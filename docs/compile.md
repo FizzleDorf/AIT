@@ -30,7 +30,6 @@ python unet.py --hf-hub-or-path "runwayml/stable-diffusion-v1-5" --width 64 1024
 ```
 python unet.py --hf-hub-or-path "runwayml/stable-diffusion-v1-5" --width 512 1024 --height 512 1024 --batch-size 1 1 --clip-chunks 8 --model-name "v1_control_unet_512_512" --work-dir "/home/user/ait_tmp/" --controlnet True
 ```
-For Control UNet only first width/height value is used, control unet is static shape only
 ```
 Usage: unet.py [OPTIONS]
 
@@ -55,26 +54,26 @@ Options:
 
 ### ControlNet
 ```
-python controlnet.py --width 512 --height 512 --batch-size 1 --model-name "v1_controlnet_512_512_1" --work-dir "/home/user/ait_tmp/"
+python controlnet.py --width 64 1024 --height 64 1024 --batch-size 1 1 --model-name "v1_controlnet_64_512_1" --work-dir "/home/user/ait_tmp/"
 ```
-Static shape only
 ```
 Usage: controlnet.py [OPTIONS]
 
 Options:
-  --hf-hub-or-path TEXT        the local diffusers pipeline directory or hf
-                               hub path e.g. lllyasviel/sd-controlnet-canny
-  --width INTEGER              width
-  --height INTEGER             height
-  --batch-size INTEGER         batch size
-  --clip-chunks INTEGER        Maximum number of clip chunks
-  --include-constants TEXT     include constants (model weights) with compiled
-                               model
-  --use-fp16-acc TEXT          use fp16 accumulation
-  --convert-conv-to-gemm TEXT  convert 1x1 conv to gemm
-  --model-name TEXT            module name
-  --work-dir TEXT              work directory
-  --help                       Show this message and exit.
+  --hf-hub-or-path TEXT           the local diffusers pipeline directory or hf
+                                  hub path e.g. lllyasviel/sd-controlnet-canny
+  --width <INTEGER INTEGER>...    Minimum and maximum width
+  --height <INTEGER INTEGER>...   Minimum and maximum height
+  --batch-size <INTEGER INTEGER>...
+                                  Minimum and maximum batch size
+  --clip-chunks INTEGER           Maximum number of clip chunks
+  --include-constants TEXT        include constants (model weights) with
+                                  compiled model
+  --use-fp16-acc TEXT             use fp16 accumulation
+  --convert-conv-to-gemm TEXT     convert 1x1 conv to gemm
+  --model-name TEXT               module name
+  --work-dir TEXT                 work directory
+  --help                          Show this message and exit.
 ```
 
 ### CLIPTextModel

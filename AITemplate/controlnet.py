@@ -33,21 +33,24 @@ from ait.compile.controlnet import compile_controlnet
 )
 @click.option(
     "--width",
-    default=512,
-    type=int,
-    help="width",
+    default=(64, 2048),
+    type=(int, int),
+    nargs=2,
+    help="Minimum and maximum width",
 )
 @click.option(
     "--height",
-    default=512,
-    type=int,
-    help="height",
+    default=(64, 2048),
+    type=(int, int),
+    nargs=2,
+    help="Minimum and maximum height",
 )
 @click.option(
     "--batch-size",
-    default=1,
-    type=int,
-    help="batch size",
+    default=(1, 4),
+    type=(int, int),
+    nargs=2,
+    help="Minimum and maximum batch size",
 )
 @click.option("--clip-chunks", default=6, help="Maximum number of clip chunks")
 @click.option(
@@ -78,11 +81,11 @@ def compile_diffusers(
         convert_conv_to_gemm = False
 
     assert (
-        width % 64 == 0
-    ), "Width must be multiple of 64, otherwise, the compilation process will fail."
+        width[0] % 64 == 0 and width[1] % 64 == 0
+    ), "Minimum Width and Maximum Width must be multiples of 64, otherwise, the compilation process will fail."
     assert (
-        height % 64 == 0
-    ), "Height must be multiples of 64, otherwise, the compilation process will fail."
+        height[0] % 64 == 0 and height[1] % 64 == 0
+    ), "Minimum Height and Maximum Height must be multiples of 64, otherwise, the compilation process will fail."
 
     pipe = ControlNetModel.from_pretrained(
         hf_hub_or_path,

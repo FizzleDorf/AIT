@@ -1,7 +1,7 @@
 # ControlNet
 
 ## Limitations
-* Static shape
+* None
 
 ## Inference
 

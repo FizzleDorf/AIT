@@ -17,9 +17,6 @@ from aitemplate.compiler import compile_model
 from aitemplate.frontend import IntVar, Tensor
 from aitemplate.testing import detect_target
 
-from ..modeling.controlnet_unet_2d_condition import (
-    ControlNetUNet2DConditionModel as ait_ControlNetUNet2DConditionModel,
-)
 from ..modeling.unet_2d_condition import (
     UNet2DConditionModel as ait_UNet2DConditionModel,
 )
@@ -71,38 +68,28 @@ def compile_unet(
 ):
     if isinstance(only_cross_attention, bool):
         only_cross_attention = [only_cross_attention] * len(block_out_channels)
-
-    if controlnet:
-        model_name = "ControlNet" + model_name
-        ait_mod = ait_ControlNetUNet2DConditionModel(
-            sample_size=sample_size,
-            cross_attention_dim=hidden_dim,
-            attention_head_dim=attention_head_dim,
-            use_linear_projection=use_linear_projection,
-        )
-    else:
-        ait_mod = ait_UNet2DConditionModel(
-            sample_size=sample_size,
-            cross_attention_dim=hidden_dim,
-            attention_head_dim=attention_head_dim,
-            use_linear_projection=use_linear_projection,
-            up_block_types=up_block_types,
-            down_block_types=down_block_types,
-            block_out_channels=block_out_channels,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            class_embed_type=class_embed_type,
-            num_class_embeds=num_class_embeds,
-            only_cross_attention=only_cross_attention,
-            dtype=dtype,
-        )
+    ait_mod = ait_UNet2DConditionModel(
+        sample_size=sample_size,
+        cross_attention_dim=hidden_dim,
+        attention_head_dim=attention_head_dim,
+        use_linear_projection=use_linear_projection,
+        up_block_types=up_block_types,
+        down_block_types=down_block_types,
+        block_out_channels=block_out_channels,
+        in_channels=in_channels,
+        out_channels=out_channels,
+        class_embed_type=class_embed_type,
+        num_class_embeds=num_class_embeds,
+        only_cross_attention=only_cross_attention,
+        dtype=dtype,
+    )
     ait_mod.name_parameter_tensor()
 
     # set AIT parameters
     pt_mod = pt_mod.eval()
     params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight", dtype=dtype)
 
-    static_shape = (width[0] == width[1] and height[0] == height[1] and batch_size[0] == batch_size[1]) or controlnet
+    static_shape = width[0] == width[1] and height[0] == height[1] and batch_size[0] == batch_size[1]
 
     if static_shape:
         batch_size = batch_size[0] * 2  # double batch size for unet
@@ -110,6 +97,20 @@ def compile_unet(
         width = width[0] // down_factor
         height_d = height
         width_d = width
+        height_1_d = height
+        width_1_d = width
+        height_2 = height // 2
+        width_2 = width // 2
+        height_4 = height // 4
+        width_4 = width // 4
+        height_8 = height // 8
+        width_8 = width // 8
+        height_2_d = height_2
+        width_2_d = width_2
+        height_4_d = height_4
+        width_4_d = width_4
+        height_8_d = height_8
+        width_8_d = width_8
     else:
         batch_size = batch_size[0], batch_size[1] * 2  # double batch size for unet
         batch_size = IntVar(values=list(batch_size), name="batch_size")
@@ -117,6 +118,20 @@ def compile_unet(
         width = width[0] // down_factor, width[1] // down_factor
         height_d = IntVar(values=list(height), name="height_d")
         width_d = IntVar(values=list(width), name="width_d")
+        height_1_d = IntVar(values=list(height), name="height_1_d")
+        width_1_d = IntVar(values=list(width), name="width_1_d")
+        height_2 = height[0] // 2, height[1] // 2
+        width_2 = width[0] // 2, width[1] // 2
+        height_4 = height[0] // 4, height[1] // 4
+        width_4 = width[0] // 4, width[1] // 4
+        height_8 = height[0] // 8, height[1] // 8
+        width_8 = width[0] // 8, width[1] // 8
+        height_2_d = IntVar(values=list(height_2), name="height_2_d")
+        width_2_d = IntVar(values=list(width_2), name="width_2_d")
+        height_4_d = IntVar(values=list(height_4), name="height_4_d")
+        width_4_d = IntVar(values=list(width_4), name="width_4_d")
+        height_8_d = IntVar(values=list(height_8), name="height_8_d")
+        width_8_d = IntVar(values=list(width_8), name="width_8_d")
 
     if static_shape:
         embedding_size = 77
@@ -140,104 +155,106 @@ def compile_unet(
             [batch_size], name="input3", dtype="int64", is_input=True
         )
 
-    mid_block_additional_residual = None
-    down_block_additional_residuals = None
+    down_block_residual_0 = None
+    down_block_residual_1 = None
+    down_block_residual_2 = None
+    down_block_residual_3 = None
+    down_block_residual_4 = None
+    down_block_residual_5 = None
+    down_block_residual_6 = None
+    down_block_residual_7 = None
+    down_block_residual_8 = None
+    down_block_residual_9 = None
+    down_block_residual_10 = None
+    down_block_residual_11 = None
+    mid_block_residual = None
     if controlnet:
         down_block_residual_0 = Tensor(
-            [batch_size, height, width, block_out_channels[0]],
+            [batch_size, height_1_d, width_1_d, block_out_channels[0]],
             name="down_block_residual_0",
             is_input=True,
         )
         down_block_residual_1 = Tensor(
-            [batch_size, height, width, block_out_channels[0]],
+            [batch_size, height_1_d, width_1_d, block_out_channels[0]],
             name="down_block_residual_1",
             is_input=True,
         )
         down_block_residual_2 = Tensor(
-            [batch_size, height, width, block_out_channels[0]],
+            [batch_size, height_1_d,width_1_d, block_out_channels[0]],
             name="down_block_residual_2",
             is_input=True,
         )
         down_block_residual_3 = Tensor(
-            [batch_size, height // 2, width // 2, block_out_channels[0]],
+            [batch_size, height_2_d, width_2_d, block_out_channels[0]],
             name="down_block_residual_3",
             is_input=True,
         )
         down_block_residual_4 = Tensor(
-            [batch_size, height // 2, width // 2, block_out_channels[1]],
+            [batch_size, height_2_d, width_2_d, block_out_channels[1]],
             name="down_block_residual_4",
             is_input=True,
         )
         down_block_residual_5 = Tensor(
-            [batch_size, height // 2, width // 2, block_out_channels[1]],
+            [batch_size, height_2_d, width_2_d, block_out_channels[1]],
             name="down_block_residual_5",
             is_input=True,
         )
         down_block_residual_6 = Tensor(
-            [batch_size, height // 4, width // 4, block_out_channels[1]],
+            [batch_size, height_4_d, width_4_d, block_out_channels[1]],
             name="down_block_residual_6",
             is_input=True,
         )
         down_block_residual_7 = Tensor(
-            [batch_size, height // 4, width // 4, block_out_channels[2]],
+            [batch_size, height_4_d, width_4_d, block_out_channels[2]],
             name="down_block_residual_7",
             is_input=True,
         )
         down_block_residual_8 = Tensor(
-            [batch_size, height // 4, width // 4, block_out_channels[2]],
+            [batch_size, height_4_d, width_4_d, block_out_channels[2]],
             name="down_block_residual_8",
             is_input=True,
         )
         down_block_residual_9 = Tensor(
-            [batch_size, height // 8, width // 8, block_out_channels[2]],
+            [batch_size, height_8_d, width_8_d, block_out_channels[2]],
             name="down_block_residual_9",
             is_input=True,
         )
         down_block_residual_10 = Tensor(
-            [batch_size, height // 8, width // 8, block_out_channels[3]],
+            [batch_size, height_8_d, width_8_d, block_out_channels[3]],
             name="down_block_residual_10",
             is_input=True,
         )
         down_block_residual_11 = Tensor(
-            [batch_size, height // 8, width // 8, block_out_channels[3]],
+            [batch_size, height_8_d, width_8_d, block_out_channels[3]],
             name="down_block_residual_11",
             is_input=True,
         )
         mid_block_residual = Tensor(
-            [batch_size, height // 8, width // 8, block_out_channels[3]],
+            [batch_size, height_8_d, width_8_d, block_out_channels[3]],
             name="mid_block_residual",
             is_input=True,
         )
 
 
-    if controlnet:
-        Y = ait_mod(
-            latent_model_input_ait,
-            timesteps_ait,
-            text_embeddings_pt_ait,
-            down_block_residual_0,
-            down_block_residual_1,
-            down_block_residual_2,
-            down_block_residual_3,
-            down_block_residual_4,
-            down_block_residual_5,
-            down_block_residual_6,
-            down_block_residual_7,
-            down_block_residual_8,
-            down_block_residual_9,
-            down_block_residual_10,
-            down_block_residual_11,
-            mid_block_residual,
-        )
-    else:
-        Y = ait_mod(
-            latent_model_input_ait,
-            timesteps_ait,
-            text_embeddings_pt_ait,
-            class_labels,
-            mid_block_additional_residual,
-            down_block_additional_residuals,
-        )
+    Y = ait_mod(
+        sample=latent_model_input_ait,
+        timesteps=timesteps_ait,
+        encoder_hidden_states=text_embeddings_pt_ait,
+        down_block_residual_0=down_block_residual_0,
+        down_block_residual_1=down_block_residual_1,
+        down_block_residual_2=down_block_residual_2,
+        down_block_residual_3=down_block_residual_3,
+        down_block_residual_4=down_block_residual_4,
+        down_block_residual_5=down_block_residual_5,
+        down_block_residual_6=down_block_residual_6,
+        down_block_residual_7=down_block_residual_7,
+        down_block_residual_8=down_block_residual_8,
+        down_block_residual_9=down_block_residual_9,
+        down_block_residual_10=down_block_residual_10,
+        down_block_residual_11=down_block_residual_11,
+        mid_block_residual=mid_block_residual,
+        class_labels=class_labels,
+    )
     mark_output(Y)
 
     target = detect_target(

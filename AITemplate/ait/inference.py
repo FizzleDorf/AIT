@@ -112,8 +112,6 @@ def controlnet_inference(
         "input2": encoder_hidden_states.to(device),
         "input3": controlnet_cond.permute((0, 2, 3, 1)).contiguous().to(device),
     }
-    for k, v in inputs.items():
-        print(k, v.shape)
     if dtype == "float16":
         for k, v in inputs.items():
             inputs[k] = v.half()
