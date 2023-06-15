@@ -55,7 +55,7 @@ def compile_vae(
     down_factor=8,
     dtype="float16",
     work_dir="./tmp",
-    vae_encode=True,
+    vae_encode=False,
 ):
     ait_vae = ait_AutoencoderKL(
         batch_size[0],

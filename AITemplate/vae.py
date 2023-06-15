@@ -58,6 +58,24 @@ from ait.compile.vae import compile_vae
     default=None,
     help="include constants (model weights) with compiled model",
 )
+@click.option(
+    "--input-size",
+    default=64,
+    type=int,
+    help="Input sample size, same as sample size of the unet model. this is 128 for x4-upscaler",
+)
+@click.option(
+    "--down-factor",
+    default=8,
+    type=int,
+    help="Down factor, this is 4 for x4-upscaler",
+)
+@click.option(
+    "--encoder",
+    default=False,
+    type=bool,
+    help="If True, compile encoder, otherwise, compile decoder",
+)
 @click.option("--use-fp16-acc", default=True, help="use fp16 accumulation")
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
 @click.option("--model-name", default="AutoencoderKL", help="module name")
@@ -69,6 +87,9 @@ def compile_diffusers(
     batch_size,
     fp32,
     include_constants,
+    input_size=64,
+    down_factor=8,
+    encoder=False,
     use_fp16_acc=True,
     convert_conv_to_gemm=True,
     model_name="AutoencoderKL",
@@ -110,11 +131,12 @@ def compile_diffusers(
         down_block_types=pipe.config.down_block_types,
         up_block_types=pipe.config.up_block_types,
         sample_size=pipe.config.sample_size,
-        input_size=(64, 64),# 128,128 x4 upscaler, value comes from unet config sample size
-        down_factor=8,# 4 for x4-upscaler
+        input_size=(input_size, input_size),
+        down_factor=down_factor,
         model_name=model_name,
         dtype="float32" if fp32 else "float16",
         work_dir=work_dir,
+        vae_encode=encoder,
     )
 
 if __name__ == "__main__":
