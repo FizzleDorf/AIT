@@ -5,7 +5,6 @@ import comfy.sample
 import comfy.utils
 import comfy.sd
 import comfy.k_diffusion.external as k_diffusion_external
-from comfy.ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 import torch
 import contextlib
 import sys
@@ -344,9 +343,8 @@ class AITemplateVAEEncode:
         pixels = pixels[:,:,:,:3]
         pixels = pixels.movedim(-1, 1)
         pixels = 2. * pixels - 1.
-        moments = vae_inference(AITemplate.modules["vae_encode"], pixels, encoder=True)
-        posterior = DiagonalGaussianDistribution(moments)
-        samples = posterior.sample() * vae.scale_factor
+        samples = vae_inference(AITemplate.modules["vae_encode"], pixels, encoder=True)
+        samples = samples * vae.scale_factor
         samples = samples.cpu()
         if keep_loaded == "disable":
             AITemplate.modules.pop("vae_encode")

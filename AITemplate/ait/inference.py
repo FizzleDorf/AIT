@@ -137,14 +137,24 @@ def vae_inference(
     device: str = "cuda",
     dtype: str = "float16",
     encoder: bool = False,
+    latent_channels: int = 4,
 ):
     batch = vae_input.shape[0]
     height, width = vae_input.shape[2], vae_input.shape[3]
+    if encoder:
+        height = height // factor
+        width = width // factor
+    else:
+        height = height * factor
+        width = width * factor
     inputs = {
         "vae_input": torch.permute(vae_input, (0, 2, 3, 1))
         .contiguous()
         .to(device),
     }
+    if encoder:
+        sample = torch.randn(batch, latent_channels, height, width)
+        inputs["vae_sample"] = torch.permute(sample, (0, 2, 3, 1)).contiguous().to(device)
     if dtype == "float16":
         for k, v in inputs.items():
             inputs[k] = v.half()
@@ -153,12 +163,8 @@ def vae_inference(
     for i in range(num_outputs):
         shape = exe_module.get_output_maximum_shape(i)
         shape[0] = batch
-        if encoder:
-            shape[1] = height // factor
-            shape[2] = width // factor
-        else:
-            shape[1] = height * factor
-            shape[2] = width * factor
+        shape[1] = height
+        shape[2] = width
         ys.append(torch.empty(shape).to(device))
         if dtype == "float16":
             ys[i] = ys[i].half()

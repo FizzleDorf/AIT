@@ -134,7 +134,7 @@ class Encoder(nn.Module):
     ):
         super().__init__()
         self.layers_per_block = layers_per_block
-        print(in_channels, block_out_channels[0])
+
         self.conv_in = nn.Conv2dBiasFewChannels(
             in_channels,
             block_out_channels[0],
@@ -212,58 +212,6 @@ class Encoder(nn.Module):
         return sample
 
 
-# class DiagonalGaussianDistribution(object):
-#     def __init__(self, parameters: Tensor, deterministic=False):
-#         self.parameters = parameters
-#         print(parameters.shape())
-#         self.mean, self.logvar = ops.chunk()(parameters, 2, dim=3)
-#         self.logvar = ops.clamp()(self.logvar, -30.0, 20.0)
-#         self.deterministic = deterministic
-#         self.std = ops.exp(0.5 * self.logvar)
-#         self.var = ops.exp(self.logvar)
-#         if self.deterministic:
-#             self.var = self.std = Tensor(self.mean.shape(), value=0.0, dtype=self.parameters._attrs["dtype"])
-
-#     def sample(self, sample):
-#         x = self.mean + self.std * sample
-#         return x
-
-#     def kl(self, other=None):
-#         if self.deterministic:
-#             return Tensor(shape=[], value=0.0, dtype=self.parameters._attrs["dtype"])
-#         else:
-#             raise NotImplementedError("KL not implemented for DiagonalGaussianDistribution")
-#             """
-#             `torch.sum` in AIT graph?
-#             """
-#             if other is None:
-#                 return 0.5 * torch.sum(ops.pow(self.mean, 2) + self.var - 1.0 - self.logvar, dim=[1, 2, 3])
-#             else:
-#                 return 0.5 * torch.sum(
-#                     ops.pow(self.mean - other.mean, 2) / other.var
-#                     + self.var / other.var
-#                     - 1.0
-#                     - self.logvar
-#                     + other.logvar,
-#                     dim=[1, 2, 3],
-#                 )
-
-#     def nll(self, sample, dims=[1, 2, 3]):
-#         if self.deterministic:
-#             return Tensor(shape=[], value=0.0, dtype=self.parameters._attrs["dtype"])
-#         raise NotImplementedError("NLL not implemented for DiagonalGaussianDistribution")
-#         """
-#         `torch.sum` in AIT graph?
-#         """
-#         np_pi = 3.141592653589793 # from print(np.pi)
-#         logtwopi = ops.log(2.0 * np_pi)
-#         return 0.5 * torch.sum(logtwopi + self.logvar + ops.pow(sample - self.mean, 2) / self.var, dim=dims)
-
-#     def mode(self):
-#         return self.mean
-
-
-
 class AutoencoderKL(nn.Module):
     def __init__(
         self,
@@ -322,8 +270,20 @@ class AutoencoderKL(nn.Module):
         dec = self.decoder(z)
         return dec
 
-    def encode(self, x: Tensor, return_dict: bool = True, deterministic: bool = False):
+    def encode(self, x: Tensor, sample: Tensor = None, return_dict: bool = True, deterministic: bool = False):
         h = self.encoder(x)
         moments = self.quant_conv(h)
-        return moments
+        if sample is None:
+            return moments
+        mean, logvar = ops.chunk()(moments, 2, dim=3)
+        logvar = ops.clamp()(logvar, -30.0, 20.0)
+        std = ops.exp(0.5 * logvar)
+        var = ops.exp(logvar)
+        if deterministic:
+            var = std = Tensor(mean.shape(), value=0.0, dtype=mean._attrs["dtype"])
+        sample._attrs["shape"] = mean._attrs["shape"]
+        std._attrs["shape"] = mean._attrs["shape"]
+        z = mean + std * sample
+        return z
+
 
