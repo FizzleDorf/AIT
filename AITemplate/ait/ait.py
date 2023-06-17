@@ -4,6 +4,7 @@ import torch
 from safetensors.torch import load_file
 
 from .load import AITLoader
+from .module import Model
 from .inference import clip_inference, unet_inference, vae_inference, controlnet_inference
 
 
@@ -93,6 +94,7 @@ class AIT:
         sequence_length: int = 77,
         dtype="float16",
         device="cuda",
+        benchmark: bool = False,
     ):
         if "unet" not in self.modules:
             raise ValueError("unet module not loaded")
@@ -107,7 +109,8 @@ class AIT:
             self.modules["unet"],
             latent_model_input=latent_model_input_pt,
             timesteps=timesteps_pt,
-            encoder_hidden_states=text_embeddings_pt
+            encoder_hidden_states=text_embeddings_pt,
+            benchmark=benchmark,
         )
         print(output.shape)
         return output

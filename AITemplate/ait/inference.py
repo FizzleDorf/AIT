@@ -56,6 +56,7 @@ def unet_inference(
     mid_block_residual: torch.Tensor = None,
     device: str = "cuda",
     dtype: str = "float16",
+    benchmark: bool = False,
 ):
     batch = latent_model_input.shape[0]
     height, width = latent_model_input.shape[2], latent_model_input.shape[3]
@@ -88,6 +89,14 @@ def unet_inference(
         ys.append(torch.empty(shape).cuda().half())
     exe_module.run_with_tensors(inputs, ys, graph_mode=False)
     noise_pred = ys[0].permute((0, 3, 1, 2)).float()
+    if benchmark:
+        t, _, _ = exe_module.benchmark_with_tensors(
+            inputs=inputs,
+            outputs=ys,
+            count=50,
+            repeat=4,
+        )
+        print(f"unet latency: {t} ms, it/s: {1000 / t}")
     return noise_pred
 
 

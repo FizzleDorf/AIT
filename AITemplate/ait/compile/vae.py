@@ -73,17 +73,20 @@ def compile_vae(
         dtype=dtype
     )
 
-    static_shape = batch_size[0] == batch_size[1] and height[0] == height[1] and width[0] == width[1]
+    static_batch = batch_size[0] == batch_size[1]
+    static_shape = height[0] == height[1] and width[0] == width[1]
     if not vae_encode:
         height = height[0] // down_factor, height[1] // down_factor
         width = width[0] // down_factor, width[1] // down_factor
 
-    if static_shape:
+    if static_batch:
         batch_size = batch_size[0]
+    else:
+        batch_size = IntVar(values=list(batch_size), name="batch_size")
+    if static_shape:
         height_d = height[0]
         width_d = width[0]
     else:
-        batch_size = IntVar(values=list(batch_size), name="batch_size")
         height_d = IntVar(values=list(height), name="height")
         width_d = IntVar(values=list(width), name="width")
 
