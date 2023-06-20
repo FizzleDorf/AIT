@@ -3,8 +3,8 @@
 Experimental usage of [AITemplate](https://github.com/facebookincubator/AITemplate).
 
 Also functions as a ComfyUI custom node
-* Drop `AITemplate` folder in `ComfyUI/custom_nodes/`
-* Put modules in `AITemplate/modules/`
+* `git clone https://github.com/hlky/AIT ComfyUI/custom_nodes/AIT`
+* Put modules in `AIT/modules/`
 * Supports UNet, **Inpainting UNet**, ControlNet, VAE and **VAE encode**
 * **ControlNet now supports dynamic shape**
 
