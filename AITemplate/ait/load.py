@@ -4,11 +4,11 @@ import torch
 try:
     from diffusers import AutoencoderKL, ControlNetModel, UNet2DConditionModel
 except ImportError:
-    print("diffusers not installed, cannot load diffusers models")
+    pass
 try:
     from transformers import CLIPTextModel
 except ImportError:
-    print("transformers not installed, cannot load transformers models")
+    pass
 
 from .module import Model
 from .util import torch_dtype_from_str, convert_ldm_unet_checkpoint, convert_text_enc_state_dict, convert_ldm_vae_checkpoint
