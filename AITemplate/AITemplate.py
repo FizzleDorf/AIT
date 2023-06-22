@@ -5,6 +5,7 @@ import comfy.sample
 import comfy.utils
 import comfy.sd
 import comfy.k_diffusion.external as k_diffusion_external
+from comfy.model_management import vram_state as vram_st
 import torch
 import contextlib
 import sys
@@ -103,25 +104,29 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
     global current_loaded_model
     global vram_state
     global AITemplate
+    global vram_st
     use_aitemplate = isinstance(model, tuple)
     if use_aitemplate:
         model, keep_loaded, aitemplate_path = model
     device = comfy.model_management.get_torch_device()
 
-    if use_aitemplate and keep_loaded == "disable" and "unet" not in AITemplate.modules:
-        AITemplate.modules["unet"] = AITemplate.loader.load(aitemplate_path)
+    has_loaded = False
+    if use_aitemplate:
+        if "unet" not in AITemplate.modules or keep_loaded == "disable":
+            AITemplate.modules["unet"] = AITemplate.loader.load(aitemplate_path)
+            has_loaded = True
 
     if noise_mask is not None:
         noise_mask = comfy.sample.prepare_mask(noise_mask, noise.shape, device)
 
     if use_aitemplate:
-        apply_aitemplate_weights = current_loaded_model != model or keep_loaded == "disable"
-        vram_state = comfy.model_management.vram_state
-        comfy.model_management.vram_state = comfy.model_management.VRAMState.DISABLED
+        apply_aitemplate_weights = has_loaded or current_loaded_model != model or ("unet" in AITemplate.modules and vram_st != comfy.model_management.VRAMState.DISABLED)
+        if vram_state is None:
+            vram_state = vram_st
+        vram_st = comfy.model_management.VRAMState.DISABLED
     else:
         if vram_state is not None:
-            comfy.model_management.vram_state = vram_state
-
+            vram_st = vram_state
     comfy.model_management.load_model_gpu(model)
     real_model = model.model
 
@@ -164,6 +169,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         AITemplate.modules.pop("unet")
         del sampler
         torch.cuda.empty_cache()
+        current_loaded_model = None
 
     return samples
 
