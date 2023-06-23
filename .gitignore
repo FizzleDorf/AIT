@@ -1,6 +1,12 @@
 tmp/
 ait_tmp/
 modules/
+*.xz
+*.png
+test*.py
+compile_*.py
+
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
