@@ -10,10 +10,23 @@ import torch
 import contextlib
 import sys
 import time
+import tempfile
 
 from .ait.inference import AITemplateModelWrapper
 from .ait import AIT
 from .ait.inference import clip_inference, unet_inference, vae_inference, controlnet_inference
+
+def cleanup_temp_library(prefix="ait", extension=".so"):
+    temp_dir = tempfile.gettempdir()
+    dir_list = os.listdir(temp_dir)
+    dir_list = [x for x in dir_list if x.startswith(prefix) and x.endswith(extension)]
+    for x in dir_list:
+        try:
+            os.remove(os.path.join(temp_dir, x))
+        except:
+            pass
+
+cleanup_temp_library(prefix="", extension=".so")
 
 supported_ait_extensions = set(['.so', '.xz'])
 base_path = os.path.dirname(os.path.realpath(__file__))

@@ -15,6 +15,7 @@
 """
 Python bindings to the AIT runtime.
 """
+import os
 import ctypes
 import enum
 import logging
@@ -183,6 +184,7 @@ class Model:
                 temp_file.write(lzma.decompress(open(lib_path, "rb").read(), format=lzma.FORMAT_AUTO))
                 temp_file.close()
                 lib_path = temp_file.name.replace("\\", "/")
+                self.temp_path = lib_path
                 
             self.DLL = ctypes.cdll.LoadLibrary(lib_path)
             self.is_open = True
@@ -190,6 +192,11 @@ class Model:
         def close(self):
             if self.is_open:
                 _dlclose(self.DLL)
+                if self.lib_path.endswith(".xz"):
+                    try:
+                        os.unlink(self.temp_path)
+                    except:
+                        pass
                 self.is_open = False
 
         def __getattr__(self, name):
