@@ -1,4 +1,5 @@
 import os
+import sys
 import comfy.model_management
 import comfy.samplers
 import comfy.sample
@@ -6,6 +7,10 @@ import comfy.utils
 import comfy.sd
 import comfy.k_diffusion.external as k_diffusion_external
 from comfy.model_management import vram_state as vram_st
+# so we can import nodes and latent_preview
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".."))
+import nodes
+import latent_preview
 import torch
 import contextlib
 import sys
@@ -114,7 +119,49 @@ def get_filename_list(folder_name):
     return list(out[0])
 
 
-def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False, noise_mask=None, sigmas=None, callback=None, disable_pbar=False):
+def common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False):
+    use_aitemplate = isinstance(model, tuple)
+    if use_aitemplate:
+        model, keep_loaded, aitemplate_path = model
+    device = comfy.model_management.get_torch_device()
+    latent_image = latent["samples"]
+
+    if disable_noise:
+        noise = torch.zeros(latent_image.size(), dtype=latent_image.dtype, layout=latent_image.layout, device="cpu")
+    else:
+        batch_inds = latent["batch_index"] if "batch_index" in latent else None
+        noise = comfy.sample.prepare_noise(latent_image, seed, batch_inds)
+
+    noise_mask = None
+    if "noise_mask" in latent:
+        noise_mask = latent["noise_mask"]
+
+    preview_format = "JPEG"
+    if preview_format not in ["JPEG", "PNG"]:
+        preview_format = "JPEG"
+
+    previewer = latent_preview.get_previewer(device, model.model.latent_format)
+
+    if use_aitemplate:
+        model = model, keep_loaded, aitemplate_path
+
+    pbar = comfy.utils.ProgressBar(steps)
+    def callback(step, x0, x, total_steps):
+        preview_bytes = None
+        if previewer:
+            preview_bytes = previewer.decode_latent_to_preview_image(preview_format, x0)
+        pbar.update_absolute(step + 1, total_steps, preview_bytes)
+
+    samples = comfy.sample.sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative, latent_image,
+                                  denoise=denoise, disable_noise=disable_noise, start_step=start_step, last_step=last_step,
+                                  force_full_denoise=force_full_denoise, noise_mask=noise_mask, callback=callback, seed=seed)
+    out = latent.copy()
+    out["samples"] = samples
+    return (out, )
+
+nodes.common_ksampler = common_ksampler 
+
+def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False, noise_mask=None, sigmas=None, callback=None, disable_pbar=False, seed=None):
     global current_loaded_model
     global vram_state
     global AITemplate
@@ -174,7 +221,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         sampler.model_wrap.parameterization = sampler.model.parameterization
         sampler.model_k = comfy.samplers.KSamplerX0Inpaint(sampler.model_wrap)
 
-    samples = sampler.sample(noise, positive_copy, negative_copy, cfg=cfg, latent_image=latent_image, start_step=start_step, last_step=last_step, force_full_denoise=force_full_denoise, denoise_mask=noise_mask, sigmas=sigmas, callback=callback, disable_pbar=disable_pbar)
+    samples = sampler.sample(noise, positive_copy, negative_copy, cfg=cfg, latent_image=latent_image, start_step=start_step, last_step=last_step, force_full_denoise=force_full_denoise, denoise_mask=noise_mask, sigmas=sigmas, callback=callback, disable_pbar=disable_pbar, seed=seed)
     samples = samples.cpu()
 
     comfy.sample.cleanup_additional_models(models)
