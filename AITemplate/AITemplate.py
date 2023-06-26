@@ -269,10 +269,10 @@ class ControlNet:
             controlnet_cond=controlnet_cond,
         )
 
-    def get_control(self, x_noisy, t, cond_txt, batched_number):
+    def get_control(self, x_noisy, t, cond, batched_number):
         control_prev = None
         if self.previous_controlnet is not None:
-            control_prev = self.previous_controlnet.get_control(x_noisy, t, cond_txt, batched_number)
+            control_prev = self.previous_controlnet.get_control(x_noisy, t, cond, batched_number)
 
         output_dtype = x_noisy.dtype
         if self.cond_hint is None or x_noisy.shape[2] * 8 != self.cond_hint.shape[2] or x_noisy.shape[3] * 8 != self.cond_hint.shape[3]:
@@ -290,10 +290,12 @@ class ControlNet:
 
             with precision_scope(comfy.model_management.get_autocast_device(self.device)):
                 self.control_model = comfy.model_management.load_if_low_vram(self.control_model)
-                control = self.control_model(x=x_noisy, hint=self.cond_hint, timesteps=t, context=cond_txt)
+                context = torch.cat(cond['c_crossattn'], 1)
+                y = cond.get('c_adm', None)
+                control = self.control_model(x=x_noisy, hint=self.cond_hint, timesteps=t, context=context, y=y)
                 self.control_model = comfy.model_management.unload_if_low_vram(self.control_model)
         else:
-            control = self.aitemplate_controlnet(x_noisy, t, cond_txt, self.cond_hint)
+            control = self.aitemplate_controlnet(x_noisy, t, cond, self.cond_hint)
         out = {'middle':[], 'output': []}
         autocast_enabled = torch.is_autocast_enabled()
 

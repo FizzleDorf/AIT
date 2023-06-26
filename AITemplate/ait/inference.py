@@ -109,15 +109,14 @@ def controlnet_inference(
     device: str = "cuda",
     dtype: str = "float16",
 ):
-    timesteps_pt = timesteps.expand(2)
-    latent_model_input = latent_model_input.expand(2, -1, -1, -1)
-    controlnet_cond = controlnet_cond.expand(2, -1, -1, -1)
-    encoder_hidden_states = encoder_hidden_states[0]
+    if controlnet_cond.shape[0] != latent_model_input.shape[0]:
+        controlnet_cond = controlnet_cond.expand(latent_model_input.shape[0], -1, -1, -1)
+    encoder_hidden_states = torch.cat(encoder_hidden_states['c_crossattn'], 1)
     inputs = {
         "input0": latent_model_input.permute((0, 2, 3, 1))
         .contiguous()
         .to(device),
-        "input1": timesteps_pt.to(device),
+        "input1": timesteps.to(device),
         "input2": encoder_hidden_states.to(device),
         "input3": controlnet_cond.permute((0, 2, 3, 1)).contiguous().to(device),
     }
