@@ -103,6 +103,7 @@ Therefore it is recommended to extract the modules yourself if you will be using
 
 * Part of the error will be printed by the AITemplate module so this will be above the trackback.
 * If that AITemplate error includes `expected`, `got`, and numbers, you may be using the wrong module, this could be resolution, batch size and you can tell from the numbers, batch size this will be like `1` `2` `4`, for resolution this will be multiples of 64.
+* If that AITemplate error is something like `Did not get correct number of inputs expected 3, got 16`, you're using the wrong module, in this case using a **unet** instead of **control_unet**.
 * If that AITemplate error includes `constants` you may have selected the wrong kind of module for the node.
 
 ## Supported model types
