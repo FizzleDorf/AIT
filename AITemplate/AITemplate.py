@@ -180,6 +180,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
 
     has_loaded = False
     if use_aitemplate:
+        context_dim = -1
         control = False
         for pos in positive:
             for x in pos:
@@ -187,12 +188,20 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
                     if "control" in x:
                         control = True
                         break
+                else:
+                    context_dim = x.shape[2]
         for neg in negative:
             for x in neg:
                 if type(x) is dict:
                     if "control" in x:
                         control = True
                         break
+        if context_dim == 1024 and "v2" not in aitemplate_path:
+            raise Exception("You are trying to use a SD2.x model with a SD1.x AITemplate. Please use a SD2.x AITemplate instead.")
+        elif context_dim == 768 and "v1" not in aitemplate_path:
+            raise Exception("You are trying to use a SD1.x model with a SD2.x AITemplate. Please use a SD1.x AITemplate instead.")
+        if context_dim != 1024 and context_dim != 768:
+            raise Exception(f"Unsupported context dimension: {context_dim}. Currently only SD1.x and SD2.x are supported.")
         if control:
             if "control_unet" not in aitemplate_path:
                 raise Exception("You are trying to use ControlNet with a regular UNet module. Please use a control_unet instead.")
