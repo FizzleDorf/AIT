@@ -76,6 +76,11 @@ def filter_files_extensions(files, extensions):
     return sorted(list(filter(lambda a: os.path.splitext(a)[-1].lower() in extensions, files)))
 
 
+def filter_files_contains(files, contains):
+    for x in contains:
+        files = list(filter(lambda a: x in a, files))
+    return sorted(files)
+
 def get_filename_list_(folder_name):
     global folder_names_and_paths
     output_list = set()
@@ -111,10 +116,10 @@ def cached_filename_list_(folder_name):
     return out
 
 def get_filename_list(folder_name):
+    global filename_list_cache
     out = cached_filename_list_(folder_name)
     if out is None:
         out = get_filename_list_(folder_name)
-        global filename_list_cache
         filename_list_cache[folder_name] = out
     return list(out[0])
 
@@ -358,7 +363,7 @@ class AITemplateLoader:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": { "model": ("MODEL",),
-                              "aitemplate_module": (get_filename_list("aitemplate"), ),
+                              "aitemplate_module": (filter_files_contains(get_filename_list("aitemplate"), set(["unet"])), ),
                               "keep_loaded": (["enable", "disable"], ),
                               }}
     RETURN_TYPES = ("MODEL",)
@@ -380,7 +385,7 @@ class AITemplateVAEEncode:
         return {"required": { 
             "pixels": ("IMAGE", ),
             "vae": ("VAE", ),
-            "aitemplate_module": (get_filename_list("aitemplate"), ),
+            "aitemplate_module": (filter_files_contains(get_filename_list("aitemplate"), set(["vae_encode"])), ),
             "keep_loaded": (["enable", "disable"], ),
         }}
     RETURN_TYPES = ("LATENT",)
@@ -429,7 +434,7 @@ class VAEEncodeForInpaint:
             "vae": ("VAE", ),
             "mask": ("MASK", ),
             "grow_mask_by": ("INT", {"default": 6, "min": 0, "max": 64, "step": 1}),
-            "aitemplate_module": (get_filename_list("aitemplate"), ),
+            "aitemplate_module": (filter_files_contains(get_filename_list("aitemplate"), set(["vae_encode"])), ),
             "keep_loaded": (["enable", "disable"], ),
         }}
     RETURN_TYPES = ("LATENT",)
@@ -489,7 +494,7 @@ class AITemplateVAEDecode:
         return {"required": 
                     { 
                     "vae": ("VAE",),
-                    "aitemplate_module": (get_filename_list("aitemplate"), ),
+                    "aitemplate_module": (filter_files_contains(get_filename_list("aitemplate"), set(["vae_64"])), ),
                     "keep_loaded": (["enable", "disable"], ),
                     "samples": ("LATENT", ), "vae": ("VAE", )
                     }
@@ -519,7 +524,7 @@ class AITemplateControlNetLoader:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": { "control_net": ("CONTROL_NET",),
-                              "aitemplate_module": (get_filename_list("aitemplate"), ),
+                              "aitemplate_module": (filter_files_contains(get_filename_list("aitemplate"), set(["controlnet"])), ),
                               }}
     RETURN_TYPES = ("CONTROL_NET",)
     FUNCTION = "load_aitemplate_controlnet"
