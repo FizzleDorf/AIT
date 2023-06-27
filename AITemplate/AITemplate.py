@@ -22,6 +22,8 @@ from .ait.inference import AITemplateModelWrapper
 from .ait import AIT
 from .ait.inference import clip_inference, unet_inference, vae_inference, controlnet_inference
 
+MAX_RESOLUTION=8192
+
 def cleanup_temp_library(prefix="ait", extension=".so"):
     temp_dir = tempfile.gettempdir()
     dir_list = os.listdir(temp_dir)
@@ -560,3 +562,21 @@ class AITemplateControlNetLoader:
         )
         return (control_net,)
 
+
+class AITemplateEmptyLatentImage:
+    def __init__(self, device="cpu"):
+        self.device = device
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { "width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
+                              "height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
+                              "batch_size": ("INT", {"default": 1, "min": 1, "max": 64})}}
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "generate"
+
+    CATEGORY = "latent"
+
+    def generate(self, width, height, batch_size=1, latent_channels=4, down_factor=8):
+        latent = torch.zeros([batch_size, latent_channels, height // down_factor, width // down_factor])
+        return ({"samples":latent}, )
