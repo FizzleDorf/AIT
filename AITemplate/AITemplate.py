@@ -580,3 +580,24 @@ class AITemplateEmptyLatentImage:
     def generate(self, width, height, batch_size=1, latent_channels=4, down_factor=8):
         latent = torch.zeros([batch_size, latent_channels, height // down_factor, width // down_factor])
         return ({"samples":latent}, )
+
+
+class AITemplateLatentUpscale:
+    upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "bislerp"]
+    crop_methods = ["disabled", "center"]
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { "samples": ("LATENT",), "upscale_method": (s.upscale_methods,),
+                              "width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
+                              "height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
+                              "crop": (s.crop_methods,)}}
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "upscale"
+
+    CATEGORY = "latent"
+
+    def upscale(self, samples, upscale_method, width, height, crop, down_factor=8):
+        s = samples.copy()
+        s["samples"] = comfy.utils.common_upscale(samples["samples"], width // down_factor, height // down_factor, upscale_method, crop)
+        return (s,)
