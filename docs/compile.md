@@ -10,8 +10,6 @@ python setup.py bdist_wheel
 pip install dist/*.whl
 ```
 
-Note: [AITemplate PR#759](https://github.com/facebookincubator/AITemplate/pull/759) is pending, this change was required when experimenting with x4-upscaler, and further changes to `modeling` in this repository rely on this change.
-
 ### VRAM Usage
 * For dynamic shape modules the vram usage of the module will be that of the maximum shape.
 * This includes batch size.
