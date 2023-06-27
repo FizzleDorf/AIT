@@ -178,6 +178,25 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
 
     has_loaded = False
     if use_aitemplate:
+        control = False
+        for pos in positive:
+            for x in pos:
+                if type(x) is dict:
+                    if "control" in x:
+                        control = True
+                        break
+        for neg in negative:
+            for x in neg:
+                if type(x) is dict:
+                    if "control" in x:
+                        control = True
+                        break
+        if control:
+            if "control_unet" not in aitemplate_path:
+                raise Exception("You are trying to use ControlNet with a regular UNet module. Please use a control_unet instead.")
+        else:
+            if "control_unet" in aitemplate_path:
+                raise Exception("You are trying to use a regular UNet module with a control_unet. Please use a regular UNet module instead.")
         if "unet" not in AITemplate.modules or keep_loaded == "disable":
             AITemplate.modules["unet"] = AITemplate.loader.load(aitemplate_path)
             has_loaded = True
