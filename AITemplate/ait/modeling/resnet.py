@@ -93,10 +93,11 @@ class Downsample2D(nn.Module):
         self.padding = padding
         stride = 2
         self.name = name
+        self.dtype = dtype
 
         if use_conv:
             conv = nn.Conv2dBias(
-                self.channels, self.out_channels, 3, stride=stride, dtype=dtype, padding=1
+                self.channels, self.out_channels, 3, stride=stride, dtype=dtype, padding=padding
             )
         else:
             assert self.channels == self.out_channels
@@ -111,9 +112,21 @@ class Downsample2D(nn.Module):
         else:
             self.conv = conv
 
-    def forward(self, x):
-        x = self.conv(x)
-        return x
+    def forward(self, hidden_states):
+        if self.use_conv and self.padding == 0:
+            padding = ops.full()([0, 1, 0, 0], 0.0, dtype=self.dtype)
+            padding._attrs["shape"][0] = hidden_states._attrs["shape"][0]
+            padding._attrs["shape"][2] = hidden_states._attrs["shape"][2]
+            padding._attrs["shape"][3] = hidden_states._attrs["shape"][3]
+            hidden_states = ops.concatenate()([hidden_states, padding], dim=1)
+            padding = ops.full()([0, 0, 1, 0], 0.0, dtype=self.dtype)
+            padding._attrs["shape"][0] = hidden_states._attrs["shape"][0]
+            padding._attrs["shape"][1] = hidden_states._attrs["shape"][1]
+            padding._attrs["shape"][3] = hidden_states._attrs["shape"][3]
+            hidden_states = ops.concatenate()([hidden_states, padding], dim=2)
+            
+        hidden_states = self.conv(hidden_states)
+        return hidden_states
 
 
 class ResnetBlock2D(nn.Module):

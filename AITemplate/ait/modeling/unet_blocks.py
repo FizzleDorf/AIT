@@ -712,7 +712,7 @@ class DownEncoderBlock2D(nn.Module):
             self.downsamplers = nn.ModuleList(
                 [
                     Downsample2D(
-                        out_channels, use_conv=True, out_channels=out_channels, padding=0, name="op", dtype=dtype,
+                        out_channels, use_conv=True, out_channels=out_channels, padding=downsample_padding, name="op", dtype=dtype,
                     )
                 ]
             )
