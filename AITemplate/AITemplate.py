@@ -168,6 +168,20 @@ def common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, 
 
 nodes.common_ksampler = common_ksampler 
 
+def maximum_batch_area():
+    global vram_state
+
+    memory_free = comfy.model_management.get_free_memory() / (1024 * 1024)
+    if comfy.model_management.xformers_enabled() or comfy.model_management.pytorch_attention_flash_attention():
+        area = 200 * memory_free
+    else:
+        #TODO: this formula is because AMD sucks and has memory management issues which might be fixed in the future
+        area = ((memory_free - 1024) * 0.9) / (0.6)
+    return int(max(area, 0))
+
+comfy.model_management.maximum_batch_area = maximum_batch_area
+
+
 def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False, noise_mask=None, sigmas=None, callback=None, disable_pbar=False, seed=None):
     global current_loaded_model
     global vram_state
