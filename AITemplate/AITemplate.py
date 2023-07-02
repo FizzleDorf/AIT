@@ -363,7 +363,10 @@ class ControlNet:
         control_prev = None
         if self.previous_controlnet is not None:
             control_prev = self.previous_controlnet.get_control(x_noisy, t, cond, batched_number)
-
+        if self.aitemplate is not None:
+            self.device = torch.device("cuda")
+            x_noisy = x_noisy.to(self.device)
+            self.cond_hint_original = self.cond_hint_original.to(self.device)
         output_dtype = x_noisy.dtype
         if self.cond_hint is None or x_noisy.shape[2] * 8 != self.cond_hint.shape[2] or x_noisy.shape[3] * 8 != self.cond_hint.shape[3]:
             if self.cond_hint is not None:
@@ -634,7 +637,7 @@ class AITemplateControlNetLoader:
         global AITemplate
         AITemplate.control_net = keep_loaded
         control_net.control_model = control_net.control_model.to("cpu")
-        control_net.device = torch.device("cpu")
+        control_net.device = torch.device("cuda")
         torch.cuda.empty_cache()
         return (control_net,)
 
