@@ -1,5 +1,9 @@
 from typing import Union
 
+import json
+import os
+import lzma
+import requests
 import torch
 try:
     from diffusers import AutoencoderKL, ControlNetModel, UNet2DConditionModel
@@ -17,6 +21,7 @@ from .util.mapping import map_clip, map_controlnet, map_unet, map_vae
 
 class AITLoader:
     def __init__(self,
+      modules_path: str = "./modules/",
       num_runtimes: int = 1,
       device: Union[str, torch.device] = "cuda",
       dtype: str = "float16",
@@ -28,6 +33,50 @@ class AITLoader:
         self.device = device
         self.dtype = dtype
         self.num_runtimes = num_runtimes
+        self.modules_path = modules_path
+        try:
+            self.modules = json.load(open(f"{modules_path}/modules.json", "r"))
+        except FileNotFoundError:
+            raise FileNotFoundError(f"modules.json not found in {modules_path}")
+        except json.decoder.JSONDecodeError:
+            raise ValueError(f"modules.json in {modules_path} is not a valid json file")
+
+    def download_module(self, sha256: str, url: str):
+        module_path = f"{self.modules_path}/{sha256}.so"
+        temp_path = f"{self.modules_path}/{sha256}.so.xz"
+        if os.path.exists(module_path):
+            return
+        r = requests.get(url, stream=True)
+        with open(temp_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+        with lzma.open(temp_path, "rb") as f:
+            with open(module_path, "wb") as g:
+                g.write(f.read())
+        os.remove(temp_path)
+
+        
+
+    def load_module(
+        self, sha256: str, url: str
+    ):
+        module_path = f"{self.modules_path}/{sha256}.so"
+        download = False
+        if not os.path.exists(module_path):
+            download = True
+        if download:
+            self.download_module(sha256, url)
+        return self.load(module_path)
+
+
+    def filter_modules(self, operating_system: str, sd: str, cuda: str, batch_size: int, resolution: int, model_type: str):
+        modules = [x for x in self.modules if x["os"] == operating_system and x["sd"] == sd and x["cuda"] == cuda and x["batch_size"] == batch_size and x["resolution"] >= resolution and model_type == x["model"]]
+        if len(modules) == 0:
+            raise ValueError(f"No modules found for {operating_system} {sd} {cuda} {batch_size} {resolution} {model_type}")
+        print(f"Found {len(modules)} modules for {operating_system} {sd} {cuda} {batch_size} {resolution} {model_type}")
+        print(f"Using {modules[0]['sha256']}")
+        return modules
+
 
     def load(
         self,

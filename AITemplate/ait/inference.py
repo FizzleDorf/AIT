@@ -97,7 +97,7 @@ def unet_inference(
             repeat=4,
         )
         print(f"unet latency: {t} ms, it/s: {1000 / t}")
-    return noise_pred
+    return noise_pred.cpu()
 
 
 def controlnet_inference(
@@ -131,7 +131,7 @@ def controlnet_inference(
         if dtype == "float16":
             ys[i] = ys[i].half()
     exe_module.run_with_tensors(inputs, ys, graph_mode=False)
-    ys = [y.permute((0, 3, 1, 2)).float() for y in ys]
+    ys = [y.permute((0, 3, 1, 2)).cpu().float() for y in ys]
     # down_block_residuals = [y for y in ys[:-1]]
     # mid_block_residual = ys[-1]
     return ys
@@ -177,7 +177,7 @@ def vae_inference(
         if dtype == "float16":
             ys[i] = ys[i].half()
     exe_module.run_with_tensors(inputs, ys, graph_mode=False)
-    vae_out = ys[0].permute((0, 3, 1, 2)).float()
+    vae_out = ys[0].permute((0, 3, 1, 2)).cpu().float()
     return vae_out
 
 
@@ -204,4 +204,4 @@ def clip_inference(
         if dtype == "float16":
             ys[i] = ys[i].half()
     exe_module.run_with_tensors(inputs, ys, graph_mode=False)
-    return ys[0].float()
+    return ys[0].cpu().float()

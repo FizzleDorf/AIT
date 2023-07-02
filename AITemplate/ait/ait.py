@@ -9,9 +9,14 @@ from .inference import clip_inference, unet_inference, vae_inference, controlnet
 
 
 class AIT:
-    def __init__(self) -> None:
+    def __init__(self, path: str) -> None:
         self.modules = {}
-        self.loader = AITLoader()
+        self.unet = {}
+        self.vae = {}
+        self.controlnet = {}
+        self.clip = {}
+        self.control_net = None
+        self.loader = AITLoader(path)
         self.supported = ['clip', 'controlnet', 'unet', 'vae']
 
     def load(self,
