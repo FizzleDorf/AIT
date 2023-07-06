@@ -94,11 +94,17 @@ class UNet2DConditionModel(nn.Module):
         ],
         conv_in_kernel = 3,
         dtype="float16",
+        time_embedding_dim = None,
+        projection_class_embeddings_input_dim = None,
+        addition_embed_type = None,
+        addition_time_embed_dim = None,
+        transformer_layers_per_block = 1,
     ):
         super().__init__()
         self.center_input_sample = center_input_sample
         self.sample_size = sample_size
-        time_embed_dim = block_out_channels[0] * 4
+        self.time_embedding_dim = time_embedding_dim
+        time_embed_dim = time_embedding_dim or block_out_channels[0] * 4
 
         # input
         self.in_channels = in_channels
@@ -111,7 +117,7 @@ class UNet2DConditionModel(nn.Module):
         conv_in_padding = (conv_in_kernel - 1) // 2
         self.conv_in = nn.Conv2dBias(in_channels, block_out_channels[0], 3, 1, conv_in_padding, dtype=dtype)
         # time
-        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos, freq_shift, dtype=dtype)
+        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos, freq_shift, dtype=dtype, arange_name="arange")
         timestep_input_dim = block_out_channels[0]
 
         self.time_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim, dtype=dtype)
@@ -124,6 +130,11 @@ class UNet2DConditionModel(nn.Module):
             self.class_embedding = nn.Identity(dtype=dtype)
         else:
             self.class_embedding = None
+
+        if addition_embed_type == "text_time":
+            self.add_time_proj = Timesteps(addition_time_embed_dim, flip_sin_to_cos, freq_shift, dtype=dtype, arange_name="add_arange")
+            self.add_embedding = TimestepEmbedding(projection_class_embeddings_input_dim, time_embed_dim, dtype=dtype)
+
         self.down_blocks = nn.ModuleList([])
         self.up_blocks = nn.ModuleList([])
 
@@ -139,6 +150,7 @@ class UNet2DConditionModel(nn.Module):
             down_block = get_down_block(
                 down_block_type,
                 num_layers=layers_per_block,
+                transformer_layers_per_block=transformer_layers_per_block[i],
                 in_channels=input_channel,
                 out_channels=output_channel,
                 temb_channels=time_embed_dim,
@@ -156,6 +168,7 @@ class UNet2DConditionModel(nn.Module):
 
         # mid
         self.mid_block = UNetMidBlock2DCrossAttn(
+            transformer_layers_per_block=transformer_layers_per_block[-1],
             in_channels=block_out_channels[-1],
             temb_channels=time_embed_dim,
             resnet_eps=norm_eps,
@@ -172,6 +185,7 @@ class UNet2DConditionModel(nn.Module):
         # up
         reversed_block_out_channels = list(reversed(block_out_channels))
         reversed_attention_head_dim = list(reversed(attention_head_dim))
+        reversed_transformer_layers_per_block = list(reversed(transformer_layers_per_block))
         output_channel = reversed_block_out_channels[0]
         for i, up_block_type in enumerate(up_block_types):
             prev_output_channel = output_channel
@@ -185,6 +199,7 @@ class UNet2DConditionModel(nn.Module):
             up_block = get_up_block(
                 up_block_type,
                 num_layers=layers_per_block + 1,
+                transformer_layers_per_block=reversed_transformer_layers_per_block[i],
                 in_channels=input_channel,
                 out_channels=output_channel,
                 prev_output_channel=prev_output_channel,
@@ -231,6 +246,8 @@ class UNet2DConditionModel(nn.Module):
         down_block_residual_11 = None,
         mid_block_residual = None,
         class_labels: Optional[Tensor] = None,
+        text_embeds: Optional[Tensor] = None,
+        time_ids: Optional[Tensor] = None,
         return_dict: bool = True,
     ):
         """r
@@ -276,6 +293,19 @@ class UNet2DConditionModel(nn.Module):
 
             class_emb = ops.batch_gather()(self.class_embedding.weight.tensor(), class_labels)
             emb = emb + class_emb
+
+        if text_embeds is not None:
+            if time_ids is None:
+                raise ValueError(
+                    "time_ids should be provided when text_embeds is not None"
+                )
+            time_embeds = self.add_time_proj(ops.flatten()(time_ids))
+            text_embeds_dim0 = ops.size()(text_embeds, 0)
+            time_embeds = ops.reshape()(time_embeds, [text_embeds_dim0, -1])
+            add_embeds = ops.concatenate()([text_embeds, time_embeds], dim=1)
+            aug_emb = self.add_embedding(add_embeds)
+            emb = emb + aug_emb
+
         # 2. pre-process
         if self.in_channels < 4:
             sample = ops.pad_last_dim(4, 4)(sample)

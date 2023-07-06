@@ -64,10 +64,24 @@ def compile_unet(
         False
     ],
     down_factor=8,
+    time_embedding_dim = None,
+    conv_in_kernel: int = 3,
+    projection_class_embeddings_input_dim = None,
+    addition_embed_type = None,
+    addition_time_embed_dim = None,
+    transformer_layers_per_block = 1,
     dtype="float16",
 ):
+    xl = False
+    if projection_class_embeddings_input_dim is not None:
+        xl = True
     if isinstance(only_cross_attention, bool):
         only_cross_attention = [only_cross_attention] * len(block_out_channels)
+    if isinstance(transformer_layers_per_block, int):
+            transformer_layers_per_block = [transformer_layers_per_block] * len(down_block_types)
+    if isinstance(attention_head_dim, int):
+        attention_head_dim = (attention_head_dim,) * len(down_block_types)
+
     ait_mod = ait_UNet2DConditionModel(
         sample_size=sample_size,
         cross_attention_dim=hidden_dim,
@@ -81,13 +95,19 @@ def compile_unet(
         class_embed_type=class_embed_type,
         num_class_embeds=num_class_embeds,
         only_cross_attention=only_cross_attention,
+        time_embedding_dim=time_embedding_dim,
+        conv_in_kernel=conv_in_kernel,
+        projection_class_embeddings_input_dim=projection_class_embeddings_input_dim,
+        addition_embed_type=addition_embed_type,
+        addition_time_embed_dim=addition_time_embed_dim,
+        transformer_layers_per_block=transformer_layers_per_block,
         dtype=dtype,
     )
     ait_mod.name_parameter_tensor()
 
     # set AIT parameters
     pt_mod = pt_mod.eval()
-    params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight", dtype=dtype)
+    params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight", dtype=dtype, xl=xl)
 
     static_shape = width[0] == width[1] and height[0] == height[1] and batch_size[0] == batch_size[1]
 
@@ -154,6 +174,15 @@ def compile_unet(
         class_labels = Tensor(
             [batch_size], name="input3", dtype="int64", is_input=True
         )
+
+    text_embeds = None
+    time_ids = None
+    #TODO: don't hardcode values
+    if xl:
+        text_embeds = Tensor(
+            [batch_size, 1280], name="text_embeds", is_input=True
+        )
+        time_ids = Tensor([batch_size, 6], name="time_ids", is_input=True)
 
     down_block_residual_0 = None
     down_block_residual_1 = None
@@ -254,6 +283,8 @@ def compile_unet(
         down_block_residual_11=down_block_residual_11,
         mid_block_residual=mid_block_residual,
         class_labels=class_labels,
+        text_embeds=text_embeds,
+        time_ids=time_ids,
     )
     mark_output(Y)
 
@@ -261,5 +292,5 @@ def compile_unet(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
     compile_model(
-        Y, target, work_dir, model_name, constants=params_ait if constants else None
+        Y, target, work_dir, model_name, constants=params_ait if constants else None, do_optimize_graph=False if xl else True
     )

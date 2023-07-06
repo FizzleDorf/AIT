@@ -31,6 +31,7 @@ def get_timestep_embedding(
     scale: float = 1,
     max_period: int = 10000,
     dtype: str = "float16",
+    arange_name = "arange",
 ):
     """
     This matches the implementation in Denoising Diffusion Probabilistic Models: Create sinusoidal timestep embeddings.
@@ -45,7 +46,7 @@ def get_timestep_embedding(
     half_dim = embedding_dim // 2
 
     exponent = (-math.log(max_period)) * Tensor(
-        shape=[half_dim], dtype=dtype, name="arange"
+        shape=[half_dim], dtype=dtype, name=arange_name
     )
 
     exponent = exponent * (1.0 / (half_dim - downscale_freq_shift))
@@ -85,13 +86,14 @@ class TimestepEmbedding(nn.Module):
 
 class Timesteps(nn.Module):
     def __init__(
-        self, num_channels: int, flip_sin_to_cos: bool, downscale_freq_shift: float, dtype: str = "float16"
+        self, num_channels: int, flip_sin_to_cos: bool, downscale_freq_shift: float, dtype: str = "float16", arange_name = "arange"
     ):
         super().__init__()
         self.num_channels = num_channels
         self.flip_sin_to_cos = flip_sin_to_cos
         self.downscale_freq_shift = downscale_freq_shift
         self.dtype = dtype
+        self.arange_name = arange_name
 
     def forward(self, timesteps):
         t_emb = get_timestep_embedding(
@@ -100,5 +102,6 @@ class Timesteps(nn.Module):
             flip_sin_to_cos=self.flip_sin_to_cos,
             downscale_freq_shift=self.downscale_freq_shift,
             dtype=self.dtype,
+            arange_name=self.arange_name,
         )
         return t_emb
