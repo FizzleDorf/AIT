@@ -2,7 +2,10 @@
  
 Experimental usage of [AITemplate](https://github.com/facebookincubator/AITemplate).
 
+
 [Pre-compiled modules](https://huggingface.co/datasets/hlky/aitemplate)
+
+[Alternative Pre-compiled modules](https://huggingface.co/city96/AITemplate)
 
 ## ComfyUI custom node
 
