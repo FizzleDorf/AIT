@@ -100,22 +100,29 @@ class AIT:
         dtype="float16",
         device="cuda",
         benchmark: bool = False,
+        add_embed_dim:int = 2816,
+        xl = False,
     ):
         if "unet" not in self.modules:
             raise ValueError("unet module not loaded")
         latent_model_input_pt = torch.randn(batch_size, latent_channels, height, width).to(device)
         text_embeddings_pt = torch.randn(batch_size, sequence_length, hidden_dim).to(device)
         timesteps_pt = torch.Tensor([1] * batch_size).to(device)
+        if xl:
+            add_embeds = torch.randn(batch_size, add_embed_dim).to(device)
         if dtype == "float16":
             latent_model_input_pt = latent_model_input_pt.half()
             text_embeddings_pt = text_embeddings_pt.half()
             timesteps_pt = timesteps_pt.half()
+            if xl:
+                add_embeds = add_embeds.half()
         output = unet_inference(
             self.modules["unet"],
             latent_model_input=latent_model_input_pt,
             timesteps=timesteps_pt,
             encoder_hidden_states=text_embeddings_pt,
             benchmark=benchmark,
+            add_embeds=add_embeds
         )
         print(output.shape)
         return output

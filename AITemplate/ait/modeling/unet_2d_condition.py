@@ -132,7 +132,6 @@ class UNet2DConditionModel(nn.Module):
             self.class_embedding = None
 
         if addition_embed_type == "text_time":
-            self.add_time_proj = Timesteps(addition_time_embed_dim, flip_sin_to_cos, freq_shift, dtype=dtype, arange_name="add_arange")
             self.add_embedding = TimestepEmbedding(projection_class_embeddings_input_dim, time_embed_dim, dtype=dtype)
 
         self.down_blocks = nn.ModuleList([])
@@ -246,8 +245,7 @@ class UNet2DConditionModel(nn.Module):
         down_block_residual_11 = None,
         mid_block_residual = None,
         class_labels: Optional[Tensor] = None,
-        text_embeds: Optional[Tensor] = None,
-        time_ids: Optional[Tensor] = None,
+        add_embeds: Optional[Tensor] = None,
         return_dict: bool = True,
     ):
         """r
@@ -294,15 +292,7 @@ class UNet2DConditionModel(nn.Module):
             class_emb = ops.batch_gather()(self.class_embedding.weight.tensor(), class_labels)
             emb = emb + class_emb
 
-        if text_embeds is not None:
-            if time_ids is None:
-                raise ValueError(
-                    "time_ids should be provided when text_embeds is not None"
-                )
-            time_embeds = self.add_time_proj(ops.flatten()(time_ids))
-            text_embeds_dim0 = ops.size()(text_embeds, 0)
-            time_embeds = ops.reshape()(time_embeds, [text_embeds_dim0, -1])
-            add_embeds = ops.concatenate()([text_embeds, time_embeds], dim=1)
+        if add_embeds is not None:
             aug_emb = self.add_embedding(add_embeds)
             emb = emb + aug_emb
 

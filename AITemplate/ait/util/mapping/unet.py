@@ -1,7 +1,7 @@
 import torch
 from ...util import torch_dtype_from_str
 
-def map_unet(pt_mod, in_channels=None, conv_in_key=None, dim=320, device="cuda", dtype="float16", xl=False):
+def map_unet(pt_mod, in_channels=None, conv_in_key=None, dim=320, device="cuda", dtype="float16"):
     if in_channels is not None and conv_in_key is None:
         raise ValueError("conv_in_key must be specified if in_channels is not None for padding")
     if not isinstance(pt_mod, dict):
@@ -43,9 +43,5 @@ def map_unet(pt_mod, in_channels=None, conv_in_key=None, dim=320, device="cuda",
     params_ait["arange"] = (
         torch.arange(start=0, end=dim // 2, dtype=torch.float32).to(device, dtype=torch_dtype_from_str(dtype))
     )
-    if xl:
-        params_ait["add_arange"] = (
-            torch.arange(start=0, end=256 // 2, dtype=torch.float32).to(device, dtype=torch_dtype_from_str(dtype))
-        )
 
     return params_ait

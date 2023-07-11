@@ -22,6 +22,7 @@ class AITemplateModelWrapper(torch.nn.Module):
         c_crossattn = None,
         c_concat = None,
         control = None,
+        c_adm = None,
         transformer_options = None,
     ):
         timesteps_pt = t
@@ -29,6 +30,7 @@ class AITemplateModelWrapper(torch.nn.Module):
         encoder_hidden_states = None
         down_block_residuals = None
         mid_block_residual = None
+        add_embeds = None
         if c_crossattn is not None:
             encoder_hidden_states = torch.cat(c_crossattn, dim=1)
         if c_concat is not None:
@@ -36,6 +38,8 @@ class AITemplateModelWrapper(torch.nn.Module):
         if control is not None:
             down_block_residuals = control["output"]
             mid_block_residual = control["middle"][0]
+        if c_adm is not None:
+            add_embeds = c_adm
         return unet_inference(
             self.unet_ait_exe,
             latent_model_input=latent_model_input,
@@ -43,6 +47,7 @@ class AITemplateModelWrapper(torch.nn.Module):
             encoder_hidden_states=encoder_hidden_states,
             down_block_residuals=down_block_residuals,
             mid_block_residual=mid_block_residual,
+            add_embeds=add_embeds,
         )
 
 
@@ -57,6 +62,7 @@ def unet_inference(
     device: str = "cuda",
     dtype: str = "float16",
     benchmark: bool = False,
+    add_embeds: torch.Tensor = None,
 ):
     batch = latent_model_input.shape[0]
     height, width = latent_model_input.shape[2], latent_model_input.shape[3]
@@ -69,11 +75,13 @@ def unet_inference(
         "input2": encoder_hidden_states.to(device),
     }
     if class_labels is not None:
-        inputs["input3"] = class_labels.contiguous().cuda()
+        inputs["input3"] = class_labels.contiguous().to(device)
     if down_block_residuals is not None and mid_block_residual is not None:
         for i, y in enumerate(down_block_residuals):
             inputs[f"down_block_residual_{i}"] = y.permute((0, 2, 3, 1)).contiguous().to(device)
         inputs["mid_block_residual"] = mid_block_residual.permute((0, 2, 3, 1)).contiguous().to(device)
+    if add_embeds is not None:
+        inputs["add_embeds"] = add_embeds.to(device)
     if dtype == "float16":
         for k, v in inputs.items():
             if k == "input3":

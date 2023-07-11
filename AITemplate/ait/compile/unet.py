@@ -107,7 +107,7 @@ def compile_unet(
 
     # set AIT parameters
     pt_mod = pt_mod.eval()
-    params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight", dtype=dtype, xl=xl)
+    params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight", dtype=dtype)
 
     static_shape = width[0] == width[1] and height[0] == height[1] and batch_size[0] == batch_size[1]
 
@@ -175,14 +175,11 @@ def compile_unet(
             [batch_size], name="input3", dtype="int64", is_input=True
         )
 
-    text_embeds = None
-    time_ids = None
-    #TODO: don't hardcode values
+    add_embeds = None
     if xl:
-        text_embeds = Tensor(
-            [batch_size, 1280], name="text_embeds", is_input=True
+        add_embeds = Tensor(
+            [batch_size, projection_class_embeddings_input_dim], name="add_embeds", is_input=True, dtype=dtype
         )
-        time_ids = Tensor([batch_size, 6], name="time_ids", is_input=True)
 
     down_block_residual_0 = None
     down_block_residual_1 = None
@@ -283,8 +280,7 @@ def compile_unet(
         down_block_residual_11=down_block_residual_11,
         mid_block_residual=mid_block_residual,
         class_labels=class_labels,
-        text_embeds=text_embeds,
-        time_ids=time_ids,
+        add_embeds=add_embeds,
     )
     mark_output(Y)
 

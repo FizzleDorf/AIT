@@ -6,7 +6,6 @@ import comfy.sample
 import comfy.utils
 import comfy.sd
 import comfy.k_diffusion.external as k_diffusion_external
-from comfy.model_management import vram_state as vram_st
 # so we can import nodes and latent_preview
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".."))
 import nodes
@@ -43,7 +42,6 @@ folder_names_and_paths = {}
 folder_names_and_paths["aitemplate"] = ([modules_dir], supported_ait_extensions)
 filename_list_cache = {}
 current_loaded_model = None
-vram_state = None
 
 modules_path = str(modules_dir).replace("\\", "/")
 AITemplate = AIT(modules_path)
@@ -181,8 +179,6 @@ def common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, 
 nodes.common_ksampler = common_ksampler 
 
 def maximum_batch_area():
-    global vram_state
-
     memory_free = comfy.model_management.get_free_memory() / (1024 * 1024)
     if comfy.model_management.xformers_enabled() or comfy.model_management.pytorch_attention_flash_attention():
         area = 200 * memory_free
@@ -204,20 +200,24 @@ def load_additional_models(positive, negative):
 
 def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False, noise_mask=None, sigmas=None, callback=None, disable_pbar=False, seed=None):
     global current_loaded_model
-    global vram_state
     global AITemplate
-    global vram_st
+    # AITemplate loader outputs tuple of model and keep_loaded
     use_aitemplate = isinstance(model, tuple)
     if use_aitemplate:
         model, keep_loaded = model
+        # Use cpu for tensors to save VRAM
         device = torch.device("cpu")
     else:
         device = comfy.model_management.get_torch_device()
 
     has_loaded = False
     if use_aitemplate:
+        """
+        Determines which module to use
+        """
         context_dim = -1
         control = False
+        # Checks positive and negative for "control" key, and gets context_dim from the shape of positive
         for pos in positive:
             for x in pos:
                 if type(x) is dict:
@@ -232,21 +232,28 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
                     if "control" in x:
                         control = True
                         break
+        # SD version according to context_dim
         sd = "v1"
         if context_dim == 1024:
             sd = "v2"
+        if context_dim == 2048:
+            sd = "xl"
         batch_size = noise.shape[0]
+        # Resolution is the maximum of height and width, multiplied by VAE scale factor, typically 8
         resolution = max(noise.shape[2], noise.shape[3]) * 8
         model_type = "unet"
         if control:
             model_type = "control_unet"
+        # Filters the modules
         module = AITemplate.loader.filter_modules(AIT_OS, sd, AIT_CUDA, batch_size, resolution, model_type)[0]
         if keep_loaded == "disable":
+            # Delete any loaded modules if keep loaded is "disable" to save VRAM
             if len(AITemplate.unet.keys()) > 0:
                 to_delete = list(AITemplate.unet.keys())
                 for x in to_delete:
                     del AITemplate.unet[x]
         if module['sha256'] not in AITemplate.unet:
+            # Load the module if it is not loaded
             AITemplate.unet[module['sha256']] = AITemplate.loader.load_module(module['sha256'], module['url'])
             has_loaded = True
 
@@ -254,26 +261,25 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         noise_mask = comfy.sample.prepare_mask(noise_mask, noise.shape, device)
 
     if use_aitemplate:
-        apply_aitemplate_weights = has_loaded or current_loaded_model != model or keep_loaded == "disable"
-        try:
-            model.patch_model()
-        except Exception as e:
-            model.unpatch_model()
-            raise e
-    else:
-        comfy.model_management.load_model_gpu(model)
-    real_model = model.model
-
-    if use_aitemplate:
-        current_loaded_model = model
-        real_model.alphas_cumprod = real_model.alphas_cumprod.float()
+        # Apply weights if module has loaded, model is not current_loaded_model or keep_loaded is "disable"
+        apply_aitemplate_weights = has_loaded or model is not current_loaded_model or keep_loaded == "disable"
+        # Patch the model for LoRAs etc
+        model.patch_model()
         if apply_aitemplate_weights:
+            # Applies model weights to the module
+            # Uses compvis mapping
+            # in_channels and conv_in_key are supplied to determine if padding is required
             AITemplate.unet[module['sha256']] = AITemplate.loader.apply_unet(
                 aitemplate_module=AITemplate.unet[module['sha256']],
-                unet=AITemplate.loader.compvis_unet(real_model.state_dict()),
-                in_channels=real_model.diffusion_model.in_channels,
+                unet=AITemplate.loader.compvis_unet(model.model.state_dict()),
+                in_channels=model.model.diffusion_model.in_channels,
                 conv_in_key="conv_in_weight",
             )
+        current_loaded_model = model
+    else:
+        comfy.model_management.load_model_gpu(model)
+
+    real_model = model.model
 
     noise = noise.to(device)
     latent_image = latent_image.to(device)
@@ -285,13 +291,17 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
 
     sampler = comfy.samplers.KSampler(real_model, steps=steps, device=device, sampler=sampler_name, scheduler=scheduler, denoise=denoise, model_options=model.model_options)
     if use_aitemplate:
+        # Wrapper for AITemplate
         model_wrapper = AITemplateModelWrapper(AITemplate.unet[module['sha256']], real_model.alphas_cumprod)
+        # Overrides sampler's model_denoise
         sampler.model_denoise = comfy.samplers.CFGNoisePredictor(model_wrapper)
+        # Overrides sampler's model_wrap
         if real_model.parameterization == "v":
             sampler.model_wrap = comfy.samplers.CompVisVDenoiser(sampler.model_denoise, quantize=True)
         else:
             sampler.model_wrap = k_diffusion_external.CompVisDenoiser(sampler.model_denoise, quantize=True)
         sampler.model_wrap.parameterization = sampler.model.parameterization
+        # Overrides sampler's model_k
         sampler.model_k = comfy.samplers.KSamplerX0Inpaint(sampler.model_wrap)
 
     samples = sampler.sample(noise, positive_copy, negative_copy, cfg=cfg, latent_image=latent_image, start_step=start_step, last_step=last_step, force_full_denoise=force_full_denoise, denoise_mask=noise_mask, sigmas=sigmas, callback=callback, disable_pbar=disable_pbar, seed=seed)
@@ -300,6 +310,10 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
     comfy.sample.cleanup_additional_models(models)
 
     if use_aitemplate and keep_loaded == "disable":
+        """
+        Cleans up current unet module
+        Also any loaded controlnet modules
+        """
         del AITemplate.unet[module['sha256']]
         del sampler
         controlnet_keys = list(AITemplate.controlnet.keys())
@@ -309,6 +323,9 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         torch.cuda.empty_cache()
         current_loaded_model = None
 
+    if use_aitemplate:
+        # Unpatches the model, prevents issues when switching models/loras
+        model.unpatch_model()
     return samples
 
 comfy.sample.sample = sample
@@ -317,6 +334,7 @@ comfy.sample.sample = sample
 
 class ControlNet:
     def __init__(self, control_model, global_average_pooling=False, device=None):
+        # Checks if controlnet is in use
         global AITemplate
         if AITemplate.control_net is not None:
             self.aitemplate = True
@@ -327,6 +345,7 @@ class ControlNet:
         self.cond_hint = None
         self.strength = 1.0
         if device is None:
+            # For ControlNet device is not changed to CPU for speed
             device = comfy.model_management.get_torch_device()
         self.device = device
         self.previous_controlnet = None
@@ -339,6 +358,8 @@ class ControlNet:
         batch = latent_model_input.shape[0] / 2
         resolution = max(latent_model_input.shape[2], latent_model_input.shape[3]) * 8
         control_net_module = None
+        # This function is called every inference step
+        # Once a module is loaded modules are not filtered again for speed
         if len(AITemplate.controlnet.keys()) == 0:
             module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, batch, resolution, "controlnet")[0]
             AITemplate.controlnet[module['sha256']] = AITemplate.loader.load_module(module['sha256'], module['url'])
@@ -364,7 +385,7 @@ class ControlNet:
         if self.previous_controlnet is not None:
             control_prev = self.previous_controlnet.get_control(x_noisy, t, cond, batched_number)
         if self.aitemplate is not None:
-            self.device = torch.device("cuda")
+            # Moves inputs to GPU
             x_noisy = x_noisy.to(self.device)
             self.cond_hint_original = self.cond_hint_original.to(self.device)
         output_dtype = x_noisy.dtype
@@ -388,6 +409,7 @@ class ControlNet:
                 control = self.control_model(x=x_noisy, hint=self.cond_hint, timesteps=t, context=context, y=y)
                 self.control_model = comfy.model_management.unload_if_low_vram(self.control_model)
         else:
+            # AITemplate inference, returns the same as regular
             control = self.aitemplate_controlnet(x_noisy, t, cond, self.cond_hint)
         out = {'middle':[], 'output': []}
         autocast_enabled = torch.is_autocast_enabled()
