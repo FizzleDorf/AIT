@@ -6,6 +6,7 @@ import comfy.sample
 import comfy.utils
 import comfy.sd
 import comfy.k_diffusion.external as k_diffusion_external
+from comfy.model_base import ModelType
 # so we can import nodes and latent_preview
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".."))
 import nodes
@@ -296,11 +297,11 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         # Overrides sampler's model_denoise
         sampler.model_denoise = comfy.samplers.CFGNoisePredictor(model_wrapper)
         # Overrides sampler's model_wrap
-        if real_model.parameterization == "v":
+        if real_model.model_type == ModelType.V_PREDICTION:
             sampler.model_wrap = comfy.samplers.CompVisVDenoiser(sampler.model_denoise, quantize=True)
         else:
             sampler.model_wrap = k_diffusion_external.CompVisDenoiser(sampler.model_denoise, quantize=True)
-        sampler.model_wrap.parameterization = sampler.model.parameterization
+            sampler.model_wrap.model_type = sampler.model.model_type
         # Overrides sampler's model_k
         sampler.model_k = comfy.samplers.KSamplerX0Inpaint(sampler.model_wrap)
 
