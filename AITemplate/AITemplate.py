@@ -137,9 +137,9 @@ def get_filename_list(folder_name):
 
 
 def common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False):
-    use_aitemplate = isinstance(model, tuple)
+    use_aitemplate = hasattr(model, 'aitemplate_keep_loaded')
     if use_aitemplate:
-        model, keep_loaded = model
+        keep_loaded = model.aitemplate_keep_loaded
     device = comfy.model_management.get_torch_device()
     latent_image = latent["samples"]
 
@@ -158,9 +158,6 @@ def common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, 
         preview_format = "JPEG"
 
     previewer = latent_preview.get_previewer(device, model.model.latent_format)
-
-    if use_aitemplate:
-        model = model, keep_loaded
 
     pbar = comfy.utils.ProgressBar(steps)
     def callback(step, x0, x, total_steps):
@@ -201,10 +198,9 @@ def load_additional_models(positive, negative):
 def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False, noise_mask=None, sigmas=None, callback=None, disable_pbar=False, seed=None):
     global current_loaded_model
     global AITemplate
-    # AITemplate loader outputs tuple of model and keep_loaded
-    use_aitemplate = isinstance(model, tuple)
+    use_aitemplate = hasattr(model, 'aitemplate_keep_loaded')
     if use_aitemplate:
-        model, keep_loaded = model
+        keep_loaded = model.aitemplate_keep_loaded
         # Use cpu for tensors to save VRAM
         device = torch.device("cpu")
     else:
@@ -481,7 +477,9 @@ class AITemplateLoader:
     CATEGORY = "loaders"
 
     def load_aitemplate(self, model, keep_loaded):
-        return ((model,keep_loaded),)
+        model = model.clone()
+        setattr(model, 'aitemplate_keep_loaded', keep_loaded)
+        return (model,)
 
 
 
