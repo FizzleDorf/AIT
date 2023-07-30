@@ -137,9 +137,9 @@ def get_filename_list(folder_name):
 
 
 def common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False):
-    use_aitemplate = hasattr(model, 'aitemplate_keep_loaded')
+    use_aitemplate = 'aitemplate_keep_loaded' in model.model_options
     if use_aitemplate:
-        keep_loaded = model.aitemplate_keep_loaded
+        keep_loaded = model.model_options['aitemplate_keep_loaded']
     device = comfy.model_management.get_torch_device()
     latent_image = latent["samples"]
 
@@ -198,9 +198,9 @@ def load_additional_models(positive, negative):
 def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False, noise_mask=None, sigmas=None, callback=None, disable_pbar=False, seed=None):
     global current_loaded_model
     global AITemplate
-    use_aitemplate = hasattr(model, 'aitemplate_keep_loaded')
+    use_aitemplate = 'aitemplate_keep_loaded' in model.model_options
     if use_aitemplate:
-        keep_loaded = model.aitemplate_keep_loaded
+        keep_loaded = model.model_options['aitemplate_keep_loaded']
         # Use cpu for tensors to save VRAM
         device = torch.device("cpu")
     else:
@@ -478,7 +478,7 @@ class AITemplateLoader:
 
     def load_aitemplate(self, model, keep_loaded):
         model = model.clone()
-        setattr(model, 'aitemplate_keep_loaded', keep_loaded)
+        model.model_options['aitemplate_keep_loaded'] = keep_loaded
         return (model,)
 
 
