@@ -328,16 +328,17 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
 comfy.sample.sample = sample
 
 
-
-class ControlNet:
+from comfy.sd import ControlBase
+class ControlNet(ControlBase):
     def __init__(self, control_model, global_average_pooling=False, device=None):
+        super().__init__(device)
         # Checks if controlnet is in use
         global AITemplate
         if AITemplate.control_net is not None:
             self.aitemplate = True
         else:
             self.aitemplate = None
-        self.control_model = control_model
+        self.control_model = control_model.to("cuda")
         self.cond_hint_original = None
         self.cond_hint = None
         self.strength = 1.0
@@ -455,6 +456,7 @@ class ControlNet:
         c = ControlNet(self.control_model)
         c.cond_hint_original = self.cond_hint_original
         c.strength = self.strength
+        self.copy_to(c)
         return c
 
     def get_models(self):
