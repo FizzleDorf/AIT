@@ -213,17 +213,19 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         """
         Determines which module to use
         """
+        keys = [key.replace("model.diffusion_model.", "") for key in model.model.diffusion_model.state_dict().keys()]
+        sd = "v1"
+        if type(model.model) == comfy.model_base.SDXLRefiner:
+            sd = "xlr"
+        elif type(model.model) == comfy.model_base.SDXL:
+            sd = "xl"
         context_dim = -1
         control = False
-        # Checks positive and negative for "control" key, and gets context_dim from the shape of positive
-        refiner = False
         for pos in positive:
             for x in pos:
                 if type(x) is dict:
                     if "control" in x:
                         control = True
-                    if "aesthetic_score" in x:
-                        refiner = True
                 else:
                     context_dim = x.shape[2]
         for neg in negative:
@@ -232,20 +234,14 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
                     if "control" in x:
                         control = True
                         break
-        # SD version according to context_dim
-        sd = "v1"
         if context_dim == 1024:
             sd = "v2"
-        if context_dim == 2048:
-            sd = "xl"
-        if refiner:
-            sd = "xlr"
         batch_size = noise.shape[0]
         # Resolution is the maximum of height and width, multiplied by VAE scale factor, typically 8
         resolution = max(noise.shape[2], noise.shape[3]) * 8
         model_type = "unet"
         if control:
-            model_type = "control_unet"
+            model_type = "unet_control"
         # Filters the modules
         module = AITemplate.loader.filter_modules(AIT_OS, sd, AIT_CUDA, batch_size, resolution, model_type)[0]
         if keep_loaded == "disable":
@@ -276,6 +272,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
                 unet=AITemplate.loader.compvis_unet(model.model.state_dict()),
                 in_channels=model.model.diffusion_model.in_channels,
                 conv_in_key="conv_in_weight",
+                dim=model.model.diffusion_model.model_channels,
             )
         current_loaded_model = model
     else:
