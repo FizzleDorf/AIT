@@ -34,7 +34,8 @@ def cleanup_temp_library(prefix="ait", extension=".dll"):
         except:
             pass
 
-cleanup_temp_library(prefix="", extension=".dll")
+extension = ".dll" if os.name == "nt" else ".so"
+cleanup_temp_library(prefix="", extension=extension)
 
 supported_ait_extensions = set(['.so', '.xz', '.dll'])
 base_path = os.path.dirname(os.path.realpath(__file__))
