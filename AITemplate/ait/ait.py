@@ -122,7 +122,7 @@ class AIT:
             timesteps=timesteps_pt,
             encoder_hidden_states=text_embeddings_pt,
             benchmark=benchmark,
-            add_embeds=add_embeds
+            add_embeds=add_embeds if xl else None,
         )
         print(output.shape)
         return output
@@ -158,6 +158,7 @@ class AIT:
         width: int = 64,
         dtype="float16",
         device="cuda",
+        benchmark: bool = False,
     ):
         if "vae" not in self.modules:
             raise ValueError("vae module not loaded")
@@ -167,6 +168,7 @@ class AIT:
         output = vae_inference(
             self.modules["vae"],
             vae_input=vae_input,
+            benchmark=benchmark,
         )
         print(output.shape)
         return output

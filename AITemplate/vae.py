@@ -28,26 +28,26 @@ from ait.compile.vae import compile_vae
 @click.command()
 @click.option(
     "--hf-hub-or-path",
-    default="./tmp/diffusers-pipeline/runwayml/stable-diffusion-v1-5",
+    default="runwayml/stable-diffusion-v1-5",
     help="the local diffusers pipeline directory or hf hub path e.g. runwayml/stable-diffusion-v1-5",
 )
 @click.option(
     "--width",
-    default=(64, 2048),
+    default=(64, 1024),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum width",
 )
 @click.option(
     "--height",
-    default=(64, 2048),
+    default=(64, 1024),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum height",
 )
 @click.option(
     "--batch-size",
-    default=(1, 4),
+    default=(1, 1),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum batch size",
@@ -100,13 +100,6 @@ def compile_diffusers(
 
     if detect_target().name() == "rocm":
         convert_conv_to_gemm = False
-
-    assert (
-        width[0] % 64 == 0 and width[1] % 64 == 0
-    ), "Minimum Width and Maximum Width must be multiples of 64, otherwise, the compilation process will fail."
-    assert (
-        height[0] % 64 == 0 and height[1] % 64 == 0
-    ), "Minimum Height and Maximum Height must be multiples of 64, otherwise, the compilation process will fail."
 
     pipe = AutoencoderKL.from_pretrained(
         hf_hub_or_path,

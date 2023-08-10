@@ -254,19 +254,14 @@ class ControlNetModel(nn.Module):
         ]
         mid_block_res_sample = mid_block_res_sample * conditioning_scale
 
-        # return (down_block_res_samples, mid_block_res_sample)
-        return (
-            down_block_res_samples[0],
-            down_block_res_samples[1],
-            down_block_res_samples[2],
-            down_block_res_samples[3],
-            down_block_res_samples[4],
-            down_block_res_samples[5],
-            down_block_res_samples[6],
-            down_block_res_samples[7],
-            down_block_res_samples[8],
-            down_block_res_samples[9],
-            down_block_res_samples[10],
-            down_block_res_samples[11],
-            mid_block_res_sample,
-        )
+        output = ()
+
+        for i in range(len(down_block_res_samples)):
+            down_block_res_samples[i]._attrs["is_output"] = True
+            down_block_res_samples[i]._attrs["name"] = f"down_block_res_sample_{i}"
+            output += (down_block_res_samples[i],)
+        mid_block_res_sample._attrs["is_output"] = True
+        mid_block_res_sample._attrs["name"] = "mid_block_res_sample"
+        output += (mid_block_res_sample,)
+
+        return output

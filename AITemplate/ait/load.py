@@ -139,8 +139,9 @@ class AITLoader:
     ):
         return UNet2DConditionModel.from_pretrained(
             hf_hub_or_path,
-            subfolder=subfolder,
-            revision=revision,
+            subfolder="unet" if not hf_hub_or_path.endswith("unet") else None,
+            variant="fp16",
+            use_safetensors=True,
             torch_dtype=torch_dtype_from_str(dtype)
         )
     
