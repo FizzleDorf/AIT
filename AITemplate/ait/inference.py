@@ -146,15 +146,15 @@ def controlnet_inference(
 
 def vae_inference(
     exe_module: Model,
-    pixels: torch.Tensor,
+    vae_input: torch.Tensor,
     factor: int = 8,
     device: str = "cuda",
     dtype: str = "float16",
     encoder: bool = False,
     latent_channels: int = 4,
 ):
-    batch = pixels.shape[0]
-    height, width = pixels.shape[2], pixels.shape[3]
+    batch = vae_input.shape[0]
+    height, width = vae_input.shape[2], vae_input.shape[3]
     if encoder:
         height = height // factor
         width = width // factor
