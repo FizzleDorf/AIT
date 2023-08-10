@@ -70,12 +70,12 @@ class AITLoader:
         return self.load(module_path)
 
 
-    def filter_modules(self, operating_system: str, sd: str, cuda: str, batch_size: int, resolution: int, model_type: str):
+    def filter_modules(self, operating_system: str, sd: str, cuda: str, batch_size: int, resolution: int, model_type: str, largest: bool = False):
         modules = [x for x in self.modules if x["os"] == operating_system and x["sd"] == sd and x["cuda"] == cuda and x["batch_size"] == batch_size and x["resolution"] >= resolution and model_type == x["model"]]
         if len(modules) == 0:
             raise ValueError(f"No modules found for {operating_system} {sd} {cuda} {batch_size} {resolution} {model_type}")
         print(f"Found {len(modules)} modules for {operating_system} {sd} {cuda} {batch_size} {resolution} {model_type}")
-        modules = sorted(modules, key=lambda k: k['resolution'], reverse=False)
+        modules = sorted(modules, key=lambda k: k['resolution'], reverse=largest)
         print(f"Using {modules[0]['sha256']}")
         return modules
 

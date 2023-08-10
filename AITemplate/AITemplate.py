@@ -1,4 +1,5 @@
 MAX_MODULES=1
+USE_LARGEST_UNET=False
 
 import os
 import sys
@@ -245,7 +246,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         if control:
             model_type = "unet_control"
         # Filters the modules
-        module = AITemplate.loader.filter_modules(AIT_OS, sd, AIT_CUDA, batch_size, resolution, model_type)[0]
+        module = AITemplate.loader.filter_modules(AIT_OS, sd, AIT_CUDA, batch_size, resolution, model_type, largest=USE_LARGEST_UNET)[0]
         if module['sha256'] not in AITemplate.unet:
             if len(AITemplate.unet.keys()) >= MAX_MODULES:
                 to_delete = list(AITemplate.unet.keys())
