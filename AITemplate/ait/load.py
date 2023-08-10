@@ -34,6 +34,7 @@ class AITLoader:
         self.dtype = dtype
         self.num_runtimes = num_runtimes
         self.modules_path = modules_path
+        self.extension = ".dll" if os.name == "nt" else ".so"
         try:
             self.modules = json.load(open(f"{modules_path}/modules.json", "r"))
         except FileNotFoundError:
@@ -42,8 +43,8 @@ class AITLoader:
             raise ValueError(f"modules.json in {modules_path} is not a valid json file")
 
     def download_module(self, sha256: str, url: str):
-        module_path = f"{self.modules_path}/{sha256}.so"
-        temp_path = f"{self.modules_path}/{sha256}.so.xz"
+        module_path = f"{self.modules_path}/{sha256}.{self.extension}"
+        temp_path = f"{self.modules_path}/{sha256}.{self.extension}.xz"
         if os.path.exists(module_path):
             return
         r = requests.get(url, stream=True)
@@ -60,7 +61,7 @@ class AITLoader:
     def load_module(
         self, sha256: str, url: str
     ):
-        module_path = f"{self.modules_path}/{sha256}.so"
+        module_path = f"{self.modules_path}/{sha256}.{self.extension}"
         download = False
         if not os.path.exists(module_path):
             download = True
