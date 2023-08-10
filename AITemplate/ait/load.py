@@ -34,7 +34,7 @@ class AITLoader:
         self.dtype = dtype
         self.num_runtimes = num_runtimes
         self.modules_path = modules_path
-        self.extension = ".dll" if os.name == "nt" else ".so"
+        self.extension = "dll" if os.name == "nt" else "so"
         try:
             self.modules = json.load(open(f"{modules_path}/modules.json", "r"))
         except FileNotFoundError:
@@ -75,6 +75,7 @@ class AITLoader:
         if len(modules) == 0:
             raise ValueError(f"No modules found for {operating_system} {sd} {cuda} {batch_size} {resolution} {model_type}")
         print(f"Found {len(modules)} modules for {operating_system} {sd} {cuda} {batch_size} {resolution} {model_type}")
+        modules = sorted(modules, key=lambda k: k['resolution'], reverse=True)
         print(f"Using {modules[0]['sha256']}")
         return modules
 
