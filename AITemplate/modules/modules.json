@@ -782,5 +782,61 @@
         "size": 71684216,
         "compressed_sha256": "28f6fddb2d7c7da8c0ad5817ebb479f23a29d444ffeee43915493640c0f4798b",
         "sha256": "096f0570594cd2c6a48704c541bbf76ec711416e05d26b9be34922452280a701"
+    },
+    {
+        "os": "linux",
+        "cuda": "sm80",
+        "model": "controlnet",
+        "sd": "v1",
+        "batch_size": 1,
+        "resolution": 2048,
+        "vram": 1230,
+        "url": "https://huggingface.co/Fizzledorf/AITemplateXL/resolve/main/modules/linux/sm80/bs1/2048/controlnet_v1_2048.so.xz",
+        "compressed_size": 5032952,
+        "size": 121003704,
+        "compressed_sha256": "7a8e3683d352af2ead3bb98fd9d9d85f237cd507385c4010829a14324f9a6e9d",
+        "sha256": "f3631c533a4d531e07bb3717d3add4803dfa73ac15429376ef69524aa07ed54f"
+    },
+    {
+        "os": "linux",
+        "cuda": "sm80",
+        "model": "controlnet",
+        "sd": "v1",
+        "batch_size": 1,
+        "resolution": 1536,
+        "vram": 705,
+        "url": "https://huggingface.co/Fizzledorf/AITemplateXL/resolve/main/modules/linux/sm80/bs1/1536/controlnet_v1_1536.so.xz",
+        "compressed_size": 5102692,
+        "size": 120915664,
+        "compressed_sha256": "53331ea27f18f880e2bb61c5cd0ce255d0cea46fb4204d55eaf630402399a4fc",
+        "sha256": "cc44ba4797d098995853a8a6e013063294b8f9dbf0318e9bb9f99d5998044821"
+    },
+    {
+        "os": "linux",
+        "cuda": "sm80",
+        "model": "controlnet",
+        "sd": "v1",
+        "batch_size": 1,
+        "resolution": 1024,
+        "vram": 330,
+        "url": "https://huggingface.co/Fizzledorf/AITemplateXL/resolve/main/modules/linux/sm80/bs1/1024/controlnet_v1_1024.so.xz",
+        "compressed_size": 5069852,
+        "size": 120904968,
+        "compressed_sha256": "91b09fbd255f186d73f4041502e6904b5d9637472ce004136d71e8ce02b235de",
+        "sha256": "9c582881da0f1589dd9b20820946cfbd0e2988106d40eea19472bd9b59204138"
+    },
+    {
+        "os": "linux",
+        "cuda": "sm80",
+        "model": "controlnet",
+        "sd": "v1",
+        "batch_size": 1,
+        "resolution": 768,
+        "vram": 199,
+        "url": "https://huggingface.co/Fizzledorf/AITemplateXL/resolve/main/modules/linux/sm80/bs1/768/controlnet_v1_768.so.xz",
+        "compressed_size": 5155816,
+        "size": 121350992,
+        "compressed_sha256": "d9b6f54943b03cdf98446e43d9453f1c04a4638610259b909f6f3188218569f6",
+        "sha256": "fd640c67f9bcf353adca1164db5687419abe7930309a395d4e22a5a9832ce077"
     }
 ]
