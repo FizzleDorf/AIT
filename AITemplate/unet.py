@@ -28,31 +28,31 @@ from ait.compile.unet import compile_unet
 @click.command()
 @click.option(
     "--hf-hub-or-path",
-    default="./tmp/diffusers-pipeline/runwayml/stable-diffusion-v1-5",
+    default="runwayml/stable-diffusion-v1-5",
     help="the local diffusers pipeline directory or hf hub path e.g. runwayml/stable-diffusion-v1-5",
 )
 @click.option(
     "--width",
-    default=(64, 2048),
+    default=(64, 1024),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum width",
 )
 @click.option(
     "--height",
-    default=(64, 2048),
+    default=(64, 1024),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum height",
 )
 @click.option(
     "--batch-size",
-    default=(1, 4),
+    default=(1, 1),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum batch size",
 )
-@click.option("--clip-chunks", default=6, help="Maximum number of clip chunks")
+@click.option("--clip-chunks", default=10, help="Maximum number of clip chunks")
 @click.option(
     "--include-constants",
     default=None,
@@ -91,16 +91,11 @@ def compile_diffusers(
     if detect_target().name() == "rocm":
         convert_conv_to_gemm = False
 
-    assert (
-        width[0] % 64 == 0 and width[1] % 64 == 0
-    ), "Minimum Width and Maximum Width must be multiples of 64, otherwise, the compilation process will fail."
-    assert (
-        height[0] % 64 == 0 and height[1] % 64 == 0
-    ), "Minimum Height and Maximum Height must be multiples of 64, otherwise, the compilation process will fail."
-
     pipe = UNet2DConditionModel.from_pretrained(
         hf_hub_or_path,
         subfolder="unet" if not hf_hub_or_path.endswith("unet") else None,
+        variant="fp16",
+        use_safetensors=True,
         torch_dtype=torch.float16,
     ).to("cuda")
 

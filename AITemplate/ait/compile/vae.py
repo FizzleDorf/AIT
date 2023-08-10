@@ -13,6 +13,7 @@
 #  limitations under the License.
 #
 
+import sys
 import torch
 from aitemplate.compiler import compile_model
 from aitemplate.frontend import IntVar, Tensor
@@ -28,8 +29,8 @@ def compile_vae(
     batch_size=(1, 8),
     height=(64, 2048),
     width=(64, 2048),
-    use_fp16_acc=False,
-    convert_conv_to_gemm=False,
+    use_fp16_acc=True,
+    convert_conv_to_gemm=True,
     model_name="AutoencoderKL",
     constants=True,
     block_out_channels=[128, 256, 512, 512],
@@ -92,7 +93,7 @@ def compile_vae(
 
     ait_input = Tensor(
         shape=[batch_size, height_d, width_d, 3 if vae_encode else latent_channels],
-        name="vae_input",
+        name="pixels" if vae_encode else "latent",
         is_input=True,
         dtype=dtype
     )
@@ -100,7 +101,7 @@ def compile_vae(
     if vae_encode:
         sample = Tensor(
             shape=[batch_size, height_d, width_d, latent_channels],
-            name="vae_sample",
+            name="random_sample",
             is_input=True,
             dtype=dtype,
         )
@@ -116,10 +117,7 @@ def compile_vae(
     target = detect_target(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
+    dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
     compile_model(
-        Y,
-        target,
-        work_dir,
-        model_name,
-        constants=params_ait if constants else None,
+        Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
     )

@@ -17,31 +17,44 @@ import logging
 import click
 import torch
 from aitemplate.testing import detect_target
-try:
-    from transformers import CLIPTextModel
-except ImportError:
-    raise ImportError(
-        "Please install transformers with `pip install transformers` to use this script."
-    )
+from transformers import CLIPTextModel, CLIPTextModelWithProjection
 from ait.compile.clip import compile_clip
 
 @click.command()
 @click.option(
     "--hf-hub-or-path",
-    default="./tmp/diffusers-pipeline/runwayml/stable-diffusion-v1-5",
+    default=r"runwayml/stable-diffusion-v1-5",
     help="the local diffusers pipeline directory or hf hub path e.g. runwayml/stable-diffusion-v1-5",
 )
 @click.option(
     "--batch-size",
-    default=(1, 4),
+    default=(1, 2),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum batch size",
 )
 @click.option(
+    "--output-hidden-states",
+    default=False,
+    type=bool,
+    help="Output hidden states",
+)
+@click.option(
+    "--text-projection",
+    default=False,
+    type=bool,
+    help="use text projection",
+)
+@click.option(
     "--include-constants",
-    default=None,
+    default=False,
+    type=bool,
     help="include constants (model weights) with compiled model",
+)
+@click.option(
+    "--subfolder",
+    default="text_encoder",
+    help="subfolder of hf repo or path. default `text_encoder`, this is `text_encoder_2` for SDXL.",
 )
 @click.option("--use-fp16-acc", default=True, help="use fp16 accumulation")
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
@@ -50,7 +63,10 @@ from ait.compile.clip import compile_clip
 def compile_diffusers(
     hf_hub_or_path,
     batch_size,
+    output_hidden_states,
+    text_projection,
     include_constants,
+    subfolder="text_encoder",
     use_fp16_acc=True,
     convert_conv_to_gemm=True,
     model_name="CLIPTextModel",
@@ -62,11 +78,22 @@ def compile_diffusers(
     if detect_target().name() == "rocm":
         convert_conv_to_gemm = False
 
-    pipe = CLIPTextModel.from_pretrained(
-        hf_hub_or_path,
-        subfolder="text_encoder" if not hf_hub_or_path.endswith("text_encoder") else None,
-        torch_dtype=torch.float16
-    ).to("cuda")
+    if text_projection:
+        pipe = CLIPTextModelWithProjection.from_pretrained(
+            hf_hub_or_path,
+            subfolder=subfolder,
+            variant="fp16",
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+        ).to("cuda")
+    else:
+        pipe = CLIPTextModel.from_pretrained(
+            hf_hub_or_path,
+            subfolder=subfolder,
+            variant="fp16",
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+        ).to("cuda")
 
     compile_clip(
         pipe,
@@ -74,11 +101,13 @@ def compile_diffusers(
         seqlen=pipe.config.max_position_embeddings,
         use_fp16_acc=use_fp16_acc,
         convert_conv_to_gemm=convert_conv_to_gemm,
+        output_hidden_states=output_hidden_states,
+        text_projection_dim=pipe.config.projection_dim if text_projection else None,
         depth=pipe.config.num_hidden_layers,
         num_heads=pipe.config.num_attention_heads,
         dim=pipe.config.hidden_size,
         act_layer=pipe.config.hidden_act,
-        constants=True if include_constants else False,
+        constants=include_constants,
         model_name=model_name,
         work_dir=work_dir,
     )

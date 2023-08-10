@@ -268,6 +268,8 @@ class AutoencoderKL(nn.Module):
     def decode(self, z: Tensor, return_dict: bool = True):
         z = self.post_quant_conv(z)
         dec = self.decoder(z)
+        dec._attrs["is_output"] = True
+        dec._attrs["name"] = "pixels"
         return dec
 
     def encode(self, x: Tensor, sample: Tensor = None, return_dict: bool = True, deterministic: bool = False):
@@ -284,6 +286,8 @@ class AutoencoderKL(nn.Module):
         sample._attrs["shape"] = mean._attrs["shape"]
         std._attrs["shape"] = mean._attrs["shape"]
         z = mean + std * sample
+        z._attrs["is_output"] = True
+        z._attrs["name"] = "latent"
         return z
 
 

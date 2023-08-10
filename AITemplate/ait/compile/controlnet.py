@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+import sys
 import torch
 from aitemplate.compiler import compile_model
 from aitemplate.frontend import IntVar, Tensor
@@ -72,14 +73,14 @@ def compile_controlnet(
         embedding_size = IntVar(values=list(clip_chunks), name="embedding_size")
 
     latent_model_input_ait = Tensor(
-        [batch_size, height_d, width_d, 4], name="input0", is_input=True
+        [batch_size, height_d, width_d, 4], name="latent_model_input", is_input=True
     )
-    timesteps_ait = Tensor([batch_size], name="input1", is_input=True)
+    timesteps_ait = Tensor([batch_size], name="timesteps", is_input=True)
     text_embeddings_pt_ait = Tensor(
-        [batch_size, embedding_size, hidden_dim], name="input2", is_input=True
+        [batch_size, embedding_size, hidden_dim], name="encoder_hidden_states", is_input=True
     )
     controlnet_condition_ait = Tensor(
-        [batch_size, height_c, width_c, 3], name="input3", is_input=True
+        [batch_size, height_c, width_c, 3], name="control_hint", is_input=True
     )
 
     Y = ait_mod(
@@ -93,6 +94,7 @@ def compile_controlnet(
     target = detect_target(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
+    dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
     compile_model(
-        Y, target, work_dir, model_name, constants=params_ait if constants else None
+        Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
     )
