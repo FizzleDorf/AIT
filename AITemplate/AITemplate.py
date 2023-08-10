@@ -1,3 +1,5 @@
+MAX_MODULES=1
+
 import os
 import sys
 import comfy.model_management
@@ -245,7 +247,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         # Filters the modules
         module = AITemplate.loader.filter_modules(AIT_OS, sd, AIT_CUDA, batch_size, resolution, model_type)[0]
         if module['sha256'] not in AITemplate.unet:
-            if len(AITemplate.unet.keys()) > 0:
+            if len(AITemplate.unet.keys()) >= MAX_MODULES:
                 to_delete = list(AITemplate.unet.keys())
                 for x in to_delete:
                     del AITemplate.unet[x]
