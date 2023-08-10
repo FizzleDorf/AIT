@@ -75,7 +75,7 @@ class AITLoader:
         if len(modules) == 0:
             raise ValueError(f"No modules found for {operating_system} {sd} {cuda} {batch_size} {resolution} {model_type}")
         print(f"Found {len(modules)} modules for {operating_system} {sd} {cuda} {batch_size} {resolution} {model_type}")
-        modules = sorted(modules, key=lambda k: k['resolution'], reverse=True)
+        modules = sorted(modules, key=lambda k: k['resolution'], reverse=False)
         print(f"Using {modules[0]['sha256']}")
         return modules
 
