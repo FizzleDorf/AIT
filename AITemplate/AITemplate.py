@@ -492,7 +492,7 @@ class AITemplateVAEEncode:
         return {"required": { 
             "pixels": ("IMAGE", ),
             "vae": ("VAE", ),
-            "keep_loaded": (["enable", "disable"], ),
+            # "keep_loaded": (["enable", "disable"], ),
         }}
     RETURN_TYPES = ("LATENT",)
     FUNCTION = "encode"
@@ -509,31 +509,31 @@ class AITemplateVAEEncode:
             pixels = pixels[:, x_offset:x + x_offset, y_offset:y + y_offset, :]
         return pixels
 
-    def encode(self, vae, pixels, keep_loaded):
+    def encode(self, vae, pixels):#, keep_loaded):
         global AITemplate
         resolution = max(pixels.shape[1], pixels.shape[2])
         model_type = "vae_encode"
         module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if module["sha256"] not in AITemplate.vae:
-            if len(AITemplate.vae.keys()) > 0:
-                to_delete = list(AITemplate.vae.keys())
-                for key in to_delete:
-                    del AITemplate.vae[key]
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
-                aitemplate_module=AITemplate.vae[module["sha256"]],
-                vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
-                encoder=True,
-            )
+        # if module["sha256"] not in AITemplate.vae:
+        if len(AITemplate.vae.keys()) > 0:
+            to_delete = list(AITemplate.vae.keys())
+            for key in to_delete:
+                del AITemplate.vae[key]
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
+            aitemplate_module=AITemplate.vae[module["sha256"]],
+            vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
+            encoder=True,
+        )
         pixels = self.vae_encode_crop_pixels(pixels)
         pixels = pixels[:,:,:,:3]
         pixels = pixels.movedim(-1, 1)
         pixels = 2. * pixels - 1.
         samples = vae_inference(AITemplate.vae[module["sha256"]], pixels, encoder=True)
         samples = samples.cpu()
-        if keep_loaded == "disable":
-            del AITemplate.vae[module["sha256"]]
-            torch.cuda.empty_cache()
+        # if keep_loaded == "disable":
+        del AITemplate.vae[module["sha256"]]
+        torch.cuda.empty_cache()
         return ({"samples":samples}, )
 
 
@@ -546,29 +546,29 @@ class VAEEncodeForInpaint:
             "vae": ("VAE", ),
             "mask": ("MASK", ),
             "grow_mask_by": ("INT", {"default": 6, "min": 0, "max": 64, "step": 1}),
-            "keep_loaded": (["enable", "disable"], ),
+            # "keep_loaded": (["enable", "disable"], ),
         }}
     RETURN_TYPES = ("LATENT",)
     FUNCTION = "encode"
 
     CATEGORY = "latent/inpaint"
 
-    def encode(self, vae, pixels, mask, keep_loaded, grow_mask_by=6):
+    def encode(self, vae, pixels, mask, grow_mask_by=6):#keep_loaded, 
         global AITemplate
         resolution = max(pixels.shape[1], pixels.shape[2])
         model_type = "vae_encode"
         module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if module["sha256"] not in AITemplate.vae:
-            if len(AITemplate.vae.keys()) > 0:
-                to_delete = list(AITemplate.vae.keys())
-                for key in to_delete:
-                    del AITemplate.vae[key]
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
-                aitemplate_module=AITemplate.vae[module["sha256"]],
-                vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
-                encoder=True,
-            )
+        # if module["sha256"] not in AITemplate.vae:
+        if len(AITemplate.vae.keys()) > 0:
+            to_delete = list(AITemplate.vae.keys())
+            for key in to_delete:
+                del AITemplate.vae[key]
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
+            aitemplate_module=AITemplate.vae[module["sha256"]],
+            vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
+            encoder=True,
+        )
         x = (pixels.shape[1] // 8) * 8
         y = (pixels.shape[2] // 8) * 8
         mask = torch.nn.functional.interpolate(mask.reshape((-1, 1, mask.shape[-2], mask.shape[-1])), size=(pixels.shape[1], pixels.shape[2]), mode="bilinear")
@@ -599,9 +599,9 @@ class VAEEncodeForInpaint:
         pixels = 2. * pixels - 1.
         samples = vae_inference(AITemplate.vae[module["sha256"]], pixels, encoder=True)
         samples = samples.cpu()
-        if keep_loaded == "disable":
-            del AITemplate.vae[module["sha256"]]
-            torch.cuda.empty_cache()
+        # if keep_loaded == "disable":
+        del AITemplate.vae[module["sha256"]]
+        torch.cuda.empty_cache()
         return ({"samples":samples, "noise_mask": (mask_erosion[:,:,:x,:y].round())}, )
 
 
@@ -611,7 +611,7 @@ class AITemplateVAEDecode:
         return {"required": 
                     { 
                     "vae": ("VAE",),
-                    "keep_loaded": (["enable", "disable"], ),
+                    # "keep_loaded": (["enable", "disable"], ),
                     "samples": ("LATENT", ), "vae": ("VAE", )
                     }
                 }
@@ -620,25 +620,25 @@ class AITemplateVAEDecode:
 
     CATEGORY = "latent"
 
-    def decode(self, vae, keep_loaded, samples):
+    def decode(self, vae, samples):
         global AITemplate
         resolution = max(samples["samples"].shape[2], samples["samples"].shape[3]) * 8
         model_type = "vae_decode"
         module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if module["sha256"] not in AITemplate.vae:
-            if len(AITemplate.vae.keys()) > 0:
-                to_delete = list(AITemplate.vae.keys())
-                for key in to_delete:
-                    del AITemplate.vae[key]
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
-                aitemplate_module=AITemplate.vae[module["sha256"]],
-                vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
-            )
+        # if module["sha256"] not in AITemplate.vae:
+        if len(AITemplate.vae.keys()) > 0:
+            to_delete = list(AITemplate.vae.keys())
+            for key in to_delete:
+                del AITemplate.vae[key]
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
+            aitemplate_module=AITemplate.vae[module["sha256"]],
+            vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
+        )
         output = (torch.clamp((vae_inference(AITemplate.vae[module["sha256"]], samples["samples"]) + 1.0) / 2.0, min=0.0, max=1.0).cpu().movedim(1,-1), )
-        if keep_loaded == "disable":
-            del AITemplate.vae[module["sha256"]]
-            torch.cuda.empty_cache()
+        # if keep_loaded == "disable":
+        del AITemplate.vae[module["sha256"]]
+        torch.cuda.empty_cache()
         return output
 
 
