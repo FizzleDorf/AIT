@@ -439,33 +439,13 @@ class ControlNet(ControlBase):
             out['input'] = control_prev['input']
         return out
 
-    def set_cond_hint(self, cond_hint, strength=1.0):
-        self.cond_hint_original = cond_hint
-        self.strength = strength
-        return self
-
-    def set_previous_controlnet(self, controlnet):
-        self.previous_controlnet = controlnet
-        return self
-
-    def cleanup(self):
-        if self.previous_controlnet is not None:
-            self.previous_controlnet.cleanup()
-        if self.cond_hint is not None:
-            del self.cond_hint
-            self.cond_hint = None
-
     def copy(self):
-        c = ControlNet(self.control_model)
-        c.cond_hint_original = self.cond_hint_original
-        c.strength = self.strength
+        c = ControlNet(self.control_model, global_average_pooling=self.global_average_pooling)
         self.copy_to(c)
         return c
 
     def get_models(self):
-        out = []
-        if self.previous_controlnet is not None:
-            out += self.previous_controlnet.get_models()
+        out = super().get_models()
         out.append(self.control_model)
         return out
 
