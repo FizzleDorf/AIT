@@ -1,3 +1,6 @@
+MAX_MODULES=1
+USE_LARGEST_UNET=False
+
 import os
 import sys
 import comfy.model_management
@@ -24,7 +27,7 @@ from .ait.inference import clip_inference, unet_inference, vae_inference, contro
 
 MAX_RESOLUTION=8192
 
-def cleanup_temp_library(prefix="ait", extension=".so"):
+def cleanup_temp_library(prefix="ait", extension=".dll"):
     temp_dir = tempfile.gettempdir()
     dir_list = os.listdir(temp_dir)
     dir_list = [x for x in dir_list if x.startswith(prefix) and x.endswith(extension)]
@@ -34,7 +37,8 @@ def cleanup_temp_library(prefix="ait", extension=".so"):
         except:
             pass
 
-cleanup_temp_library(prefix="", extension=".so")
+extension = ".dll" if os.name == "nt" else ".so"
+cleanup_temp_library(prefix="", extension=extension)
 
 supported_ait_extensions = set(['.so', '.xz', '.dll'])
 base_path = os.path.dirname(os.path.realpath(__file__))
@@ -212,15 +216,19 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         """
         Determines which module to use
         """
+        keys = [key.replace("model.diffusion_model.", "") for key in model.model.diffusion_model.state_dict().keys()]
+        sd = "v1"
+        if type(model.model) == comfy.model_base.SDXLRefiner:
+            sd = "xlr"
+        elif type(model.model) == comfy.model_base.SDXL:
+            sd = "xl"
         context_dim = -1
         control = False
-        # Checks positive and negative for "control" key, and gets context_dim from the shape of positive
         for pos in positive:
             for x in pos:
                 if type(x) is dict:
                     if "control" in x:
                         control = True
-                        break
                 else:
                     context_dim = x.shape[2]
         for neg in negative:
@@ -229,27 +237,21 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
                     if "control" in x:
                         control = True
                         break
-        # SD version according to context_dim
-        sd = "v1"
         if context_dim == 1024:
             sd = "v2"
-        if context_dim == 2048:
-            sd = "xl"
         batch_size = noise.shape[0]
         # Resolution is the maximum of height and width, multiplied by VAE scale factor, typically 8
         resolution = max(noise.shape[2], noise.shape[3]) * 8
         model_type = "unet"
         if control:
-            model_type = "control_unet"
+            model_type = "unet_control"
         # Filters the modules
-        module = AITemplate.loader.filter_modules(AIT_OS, sd, AIT_CUDA, batch_size, resolution, model_type)[0]
-        if keep_loaded == "disable":
-            # Delete any loaded modules if keep loaded is "disable" to save VRAM
-            if len(AITemplate.unet.keys()) > 0:
+        module = AITemplate.loader.filter_modules(AIT_OS, sd, AIT_CUDA, batch_size, resolution, model_type, largest=USE_LARGEST_UNET)[0]
+        if module['sha256'] not in AITemplate.unet:
+            if len(AITemplate.unet.keys()) >= MAX_MODULES:
                 to_delete = list(AITemplate.unet.keys())
                 for x in to_delete:
                     del AITemplate.unet[x]
-        if module['sha256'] not in AITemplate.unet:
             # Load the module if it is not loaded
             AITemplate.unet[module['sha256']] = AITemplate.loader.load_module(module['sha256'], module['url'])
             has_loaded = True
@@ -271,6 +273,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
                 unet=AITemplate.loader.compvis_unet(model.model.state_dict()),
                 in_channels=model.model.diffusion_model.in_channels,
                 conv_in_key="conv_in_weight",
+                dim=model.model.diffusion_model.model_channels,
             )
         current_loaded_model = model
     else:
@@ -492,7 +495,7 @@ class AITemplateVAEEncode:
         return {"required": { 
             "pixels": ("IMAGE", ),
             "vae": ("VAE", ),
-            "keep_loaded": (["enable", "disable"], ),
+            # "keep_loaded": (["enable", "disable"], ),
         }}
     RETURN_TYPES = ("LATENT",)
     FUNCTION = "encode"
@@ -509,32 +512,31 @@ class AITemplateVAEEncode:
             pixels = pixels[:, x_offset:x + x_offset, y_offset:y + y_offset, :]
         return pixels
 
-    def encode(self, vae, pixels, keep_loaded):
+    def encode(self, vae, pixels):#, keep_loaded):
         global AITemplate
         resolution = max(pixels.shape[1], pixels.shape[2])
         model_type = "vae_encode"
-        if keep_loaded == "disable":
-            if len(AITemplate.vae.keys()) > 0:
-                to_delete = list(AITemplate.vae.keys())
-                for key in to_delete:
-                    del AITemplate.vae[key]
         module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if module["sha256"] not in AITemplate.vae:
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
-                aitemplate_module=AITemplate.vae[module["sha256"]],
-                vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
-                encoder=True,
-            )
+        # if module["sha256"] not in AITemplate.vae:
+        if len(AITemplate.vae.keys()) > 0:
+            to_delete = list(AITemplate.vae.keys())
+            for key in to_delete:
+                del AITemplate.vae[key]
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
+            aitemplate_module=AITemplate.vae[module["sha256"]],
+            vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
+            encoder=True,
+        )
         pixels = self.vae_encode_crop_pixels(pixels)
         pixels = pixels[:,:,:,:3]
         pixels = pixels.movedim(-1, 1)
         pixels = 2. * pixels - 1.
         samples = vae_inference(AITemplate.vae[module["sha256"]], pixels, encoder=True)
         samples = samples.cpu()
-        if keep_loaded == "disable":
-            del AITemplate.vae[module["sha256"]]
-            torch.cuda.empty_cache()
+        # if keep_loaded == "disable":
+        del AITemplate.vae[module["sha256"]]
+        torch.cuda.empty_cache()
         return ({"samples":samples}, )
 
 
@@ -547,30 +549,29 @@ class VAEEncodeForInpaint:
             "vae": ("VAE", ),
             "mask": ("MASK", ),
             "grow_mask_by": ("INT", {"default": 6, "min": 0, "max": 64, "step": 1}),
-            "keep_loaded": (["enable", "disable"], ),
+            # "keep_loaded": (["enable", "disable"], ),
         }}
     RETURN_TYPES = ("LATENT",)
     FUNCTION = "encode"
 
     CATEGORY = "latent/inpaint"
 
-    def encode(self, vae, pixels, mask, keep_loaded, grow_mask_by=6):
+    def encode(self, vae, pixels, mask, grow_mask_by=6):#keep_loaded, 
         global AITemplate
         resolution = max(pixels.shape[1], pixels.shape[2])
         model_type = "vae_encode"
-        if keep_loaded == "disable":
-            if len(AITemplate.vae.keys()) > 0:
-                to_delete = list(AITemplate.vae.keys())
-                for key in to_delete:
-                    del AITemplate.vae[key]
         module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if module["sha256"] not in AITemplate.vae:
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
-                aitemplate_module=AITemplate.vae[module["sha256"]],
-                vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
-                encoder=True,
-            )
+        # if module["sha256"] not in AITemplate.vae:
+        if len(AITemplate.vae.keys()) > 0:
+            to_delete = list(AITemplate.vae.keys())
+            for key in to_delete:
+                del AITemplate.vae[key]
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
+            aitemplate_module=AITemplate.vae[module["sha256"]],
+            vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
+            encoder=True,
+        )
         x = (pixels.shape[1] // 8) * 8
         y = (pixels.shape[2] // 8) * 8
         mask = torch.nn.functional.interpolate(mask.reshape((-1, 1, mask.shape[-2], mask.shape[-1])), size=(pixels.shape[1], pixels.shape[2]), mode="bilinear")
@@ -601,9 +602,9 @@ class VAEEncodeForInpaint:
         pixels = 2. * pixels - 1.
         samples = vae_inference(AITemplate.vae[module["sha256"]], pixels, encoder=True)
         samples = samples.cpu()
-        if keep_loaded == "disable":
-            del AITemplate.vae[module["sha256"]]
-            torch.cuda.empty_cache()
+        # if keep_loaded == "disable":
+        del AITemplate.vae[module["sha256"]]
+        torch.cuda.empty_cache()
         return ({"samples":samples, "noise_mask": (mask_erosion[:,:,:x,:y].round())}, )
 
 
@@ -613,7 +614,7 @@ class AITemplateVAEDecode:
         return {"required": 
                     { 
                     "vae": ("VAE",),
-                    "keep_loaded": (["enable", "disable"], ),
+                    # "keep_loaded": (["enable", "disable"], ),
                     "samples": ("LATENT", ), "vae": ("VAE", )
                     }
                 }
@@ -622,26 +623,25 @@ class AITemplateVAEDecode:
 
     CATEGORY = "latent"
 
-    def decode(self, vae, keep_loaded, samples):
+    def decode(self, vae, samples):
         global AITemplate
         resolution = max(samples["samples"].shape[2], samples["samples"].shape[3]) * 8
-        model_type = "vae"
+        model_type = "vae_decode"
         module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if keep_loaded == "disable":
-            if len(AITemplate.vae.keys()) > 0:
-                to_delete = list(AITemplate.vae.keys())
-                for key in to_delete:
-                    del AITemplate.vae[key]
-        if module["sha256"] not in AITemplate.vae:
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
-            AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
-                aitemplate_module=AITemplate.vae[module["sha256"]],
-                vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
-            )
+        # if module["sha256"] not in AITemplate.vae:
+        if len(AITemplate.vae.keys()) > 0:
+            to_delete = list(AITemplate.vae.keys())
+            for key in to_delete:
+                del AITemplate.vae[key]
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
+        AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
+            aitemplate_module=AITemplate.vae[module["sha256"]],
+            vae=AITemplate.loader.compvis_vae(vae.first_stage_model.state_dict()),
+        )
         output = (torch.clamp((vae_inference(AITemplate.vae[module["sha256"]], samples["samples"]) + 1.0) / 2.0, min=0.0, max=1.0).cpu().movedim(1,-1), )
-        if keep_loaded == "disable":
-            del AITemplate.vae[module["sha256"]]
-            torch.cuda.empty_cache()
+        # if keep_loaded == "disable":
+        del AITemplate.vae[module["sha256"]]
+        torch.cuda.empty_cache()
         return output
 
 
@@ -663,42 +663,3 @@ class AITemplateControlNetLoader:
         control_net.device = torch.device("cuda")
         torch.cuda.empty_cache()
         return (control_net,)
-
-class AITemplateEmptyLatentImage:
-    def __init__(self, device="cpu"):
-        self.device = device
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required": { "width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
-                              "height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
-                              "batch_size": ("INT", {"default": 1, "min": 1, "max": 64})}}
-    RETURN_TYPES = ("LATENT",)
-    FUNCTION = "generate"
-
-    CATEGORY = "latent"
-
-    def generate(self, width, height, batch_size=1, latent_channels=4, down_factor=8):
-        latent = torch.zeros([batch_size, latent_channels, height // down_factor, width // down_factor])
-        return ({"samples":latent}, )
-
-
-class AITemplateLatentUpscale:
-    upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "bislerp"]
-    crop_methods = ["disabled", "center"]
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required": { "samples": ("LATENT",), "upscale_method": (s.upscale_methods,),
-                              "width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
-                              "height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
-                              "crop": (s.crop_methods,)}}
-    RETURN_TYPES = ("LATENT",)
-    FUNCTION = "upscale"
-
-    CATEGORY = "latent"
-
-    def upscale(self, samples, upscale_method, width, height, crop, down_factor=8):
-        s = samples.copy()
-        s["samples"] = comfy.utils.common_upscale(samples["samples"], width // down_factor, height // down_factor, upscale_method, crop)
-        return (s,)

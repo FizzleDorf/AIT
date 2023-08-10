@@ -36,10 +36,10 @@ class AIT:
             self.modules["unet"] = self.loader.load(aitemplate_path)
             unet = self.loader.diffusers_unet(hf_hub_or_path)
             self.modules["unet"] = self.loader.apply_unet(self.modules["unet"], unet)
-        elif module_type == "vae":
-            self.modules["vae"] = self.loader.load(aitemplate_path)
+        elif module_type == "vae_decode":
+            self.modules["vae_decode"] = self.loader.load(aitemplate_path)
             vae = self.loader.diffusers_vae(hf_hub_or_path)
-            self.modules["vae"] = self.loader.apply_vae(self.modules["vae"], vae)
+            self.modules["vae_decode"] = self.loader.apply_vae(self.modules["vae_decode"], vae)
         elif module_type == "vae_encode":
             self.modules["vae_encode"] = self.loader.load(aitemplate_path)
             vae = self.loader.diffusers_vae(hf_hub_or_path)
@@ -77,10 +77,10 @@ class AIT:
             self.modules["unet"] = self.loader.load(aitemplate_path)
             unet = self.loader.compvis_unet(state_dict)
             self.modules["unet"] = self.loader.apply_unet(self.modules["unet"], unet)
-        elif module_type == "vae":
-            self.modules["vae"] = self.loader.load(aitemplate_path)
+        elif module_type == "vae_decode":
+            self.modules["vae_decode"] = self.loader.load(aitemplate_path)
             vae = self.loader.compvis_vae(state_dict)
-            self.modules["vae"] = self.loader.apply_vae(self.modules["vae"], vae)
+            self.modules["vae_decode"] = self.loader.apply_vae(self.modules["vae_decode"], vae)
         elif module_type == "vae_encode":
             self.modules["vae_encode"] = self.loader.load(aitemplate_path)
             vae = self.loader.compvis_vae(state_dict)
@@ -122,7 +122,7 @@ class AIT:
             timesteps=timesteps_pt,
             encoder_hidden_states=text_embeddings_pt,
             benchmark=benchmark,
-            add_embeds=add_embeds
+            add_embeds=add_embeds if xl else None,
         )
         print(output.shape)
         return output
@@ -158,15 +158,17 @@ class AIT:
         width: int = 64,
         dtype="float16",
         device="cuda",
+        benchmark: bool = False,
     ):
-        if "vae" not in self.modules:
+        if "vae_decode" not in self.modules:
             raise ValueError("vae module not loaded")
         vae_input = torch.randn(batch_size, latent_channels, height, width).to(device)
         if dtype == "float16":
             vae_input = vae_input.half()
         output = vae_inference(
-            self.modules["vae"],
+            self.modules["vae_decode"],
             vae_input=vae_input,
+            benchmark=benchmark,
         )
         print(output.shape)
         return output

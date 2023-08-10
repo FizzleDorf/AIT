@@ -176,11 +176,12 @@ class Model:
             lib_path: str,
         ):
             self.lib_path = lib_path
+            self.extension = ".dll" if os.name == "nt" else ".so"
             if lib_path.endswith(".xz"):
                 import lzma
                 import tempfile
 
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".so")
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=self.extension)
                 temp_file.write(lzma.decompress(open(lib_path, "rb").read(), format=lzma.FORMAT_AUTO))
                 temp_file.close()
                 lib_path = temp_file.name.replace("\\", "/")

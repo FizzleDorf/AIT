@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-
+import sys
 from aitemplate.compiler import compile_model
 from aitemplate.frontend import IntVar, Tensor
 from aitemplate.testing import detect_target
@@ -30,8 +30,10 @@ def compile_clip(
     dim=768,
     num_heads=12,
     depth=12,
-    use_fp16_acc=False,
-    convert_conv_to_gemm=False,
+    output_hidden_states=False,
+    text_projection_dim=None,
+    use_fp16_acc=True,
+    convert_conv_to_gemm=True,
     act_layer="gelu",
     constants=True,
     model_name="CLIPTextModel",
@@ -49,6 +51,8 @@ def compile_clip(
         causal=causal,
         mask_seq=mask_seq,
         act_layer=act_layer,
+        output_hidden_states=output_hidden_states,
+        text_projection_dim=text_projection_dim,
     )
     ait_mod.name_parameter_tensor()
 
@@ -62,17 +66,19 @@ def compile_clip(
         batch_size = IntVar(values=list(batch_size), name="batch_size")
 
     input_ids_ait = Tensor(
-        [batch_size, seqlen], name="input0", dtype="int64", is_input=True
+        [batch_size, seqlen], name="input_ids", dtype="int64", is_input=True
     )
     position_ids_ait = Tensor(
-        [batch_size, seqlen], name="input1", dtype="int64", is_input=True
+        [batch_size, seqlen], name="position_ids", dtype="int64", is_input=True
     )
+
     Y = ait_mod(input_ids=input_ids_ait, position_ids=position_ids_ait)
     mark_output(Y)
 
     target = detect_target(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
+    dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
     compile_model(
-        Y, target, work_dir, model_name, constants=params_ait if constants else None
+        Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name
     )
