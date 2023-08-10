@@ -215,12 +215,14 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         context_dim = -1
         control = False
         # Checks positive and negative for "control" key, and gets context_dim from the shape of positive
+        refiner = False
         for pos in positive:
             for x in pos:
                 if type(x) is dict:
                     if "control" in x:
                         control = True
-                        break
+                    if "aesthetic_score" in x:
+                        refiner = True
                 else:
                     context_dim = x.shape[2]
         for neg in negative:
@@ -235,6 +237,8 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
             sd = "v2"
         if context_dim == 2048:
             sd = "xl"
+        if refiner:
+            sd = "xlr"
         batch_size = noise.shape[0]
         # Resolution is the maximum of height and width, multiplied by VAE scale factor, typically 8
         resolution = max(noise.shape[2], noise.shape[3]) * 8
