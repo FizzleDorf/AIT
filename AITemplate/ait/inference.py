@@ -68,14 +68,14 @@ def unet_inference(
     height, width = latent_model_input.shape[2], latent_model_input.shape[3]
     timesteps_pt = timesteps.expand(batch)
     inputs = {
-        "input0": latent_model_input.permute((0, 2, 3, 1))
+        "latent_model_input": latent_model_input.permute((0, 2, 3, 1))
         .contiguous()
         .to(device),
-        "input1": timesteps_pt.to(device),
-        "input2": encoder_hidden_states.to(device),
+        "timesteps": timesteps_pt.to(device),
+        "encoder_hidden_states": encoder_hidden_states.to(device),
     }
     if class_labels is not None:
-        inputs["input3"] = class_labels.contiguous().to(device)
+        inputs["class_labels "] = class_labels.contiguous().to(device)
     if down_block_residuals is not None and mid_block_residual is not None:
         for i, y in enumerate(down_block_residuals):
             inputs[f"down_block_residual_{i}"] = y.permute((0, 2, 3, 1)).contiguous().to(device)
@@ -84,7 +84,7 @@ def unet_inference(
         inputs["add_embeds"] = add_embeds.to(device)
     if dtype == "float16":
         for k, v in inputs.items():
-            if k == "input3":
+            if k == "class_labels ":
                 continue
             inputs[k] = v.half()
     ys = []
@@ -148,15 +148,15 @@ def controlnet_inference(
 
 def vae_inference(
     exe_module: Model,
-    vae_input: torch.Tensor,
+    pixels: torch.Tensor,
     factor: int = 8,
     device: str = "cuda",
     dtype: str = "float16",
     encoder: bool = False,
     latent_channels: int = 4,
 ):
-    batch = vae_input.shape[0]
-    height, width = vae_input.shape[2], vae_input.shape[3]
+    batch = pixels.shape[0]
+    height, width = pixels.shape[2], pixels.shape[3]
     if encoder:
         height = height // factor
         width = width // factor
@@ -164,13 +164,13 @@ def vae_inference(
         height = height * factor
         width = width * factor
     inputs = {
-        "vae_input": torch.permute(vae_input, (0, 2, 3, 1))
+        "latent": torch.permute(pixels, (0, 2, 3, 1))
         .contiguous()
         .to(device),
     }
     if encoder:
         sample = torch.randn(batch, latent_channels, height, width)
-        inputs["vae_sample"] = torch.permute(sample, (0, 2, 3, 1)).contiguous().to(device)
+        inputs["random_sample"] = torch.permute(sample, (0, 2, 3, 1)).contiguous().to(device)
     if dtype == "float16":
         for k, v in inputs.items():
             inputs[k] = v.half()

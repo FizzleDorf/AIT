@@ -24,7 +24,7 @@ from .ait.inference import clip_inference, unet_inference, vae_inference, contro
 
 MAX_RESOLUTION=8192
 
-def cleanup_temp_library(prefix="ait", extension=".so"):
+def cleanup_temp_library(prefix="ait", extension=".dll"):
     temp_dir = tempfile.gettempdir()
     dir_list = os.listdir(temp_dir)
     dir_list = [x for x in dir_list if x.startswith(prefix) and x.endswith(extension)]
@@ -34,7 +34,7 @@ def cleanup_temp_library(prefix="ait", extension=".so"):
         except:
             pass
 
-cleanup_temp_library(prefix="", extension=".so")
+cleanup_temp_library(prefix="", extension=".dll")
 
 supported_ait_extensions = set(['.so', '.xz', '.dll'])
 base_path = os.path.dirname(os.path.realpath(__file__))
