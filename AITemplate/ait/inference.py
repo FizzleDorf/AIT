@@ -84,7 +84,7 @@ def unet_inference(
         inputs["add_embeds"] = add_embeds.to(device)
     if dtype == "float16":
         for k, v in inputs.items():
-            if k == "input3":
+            if k == "class_labels ":
                 continue
             inputs[k] = v.half()
     ys = []
@@ -146,15 +146,15 @@ def controlnet_inference(
 
 def vae_inference(
     exe_module: Model,
-    vae_input: torch.Tensor,
+    pixels: torch.Tensor,
     factor: int = 8,
     device: str = "cuda",
     dtype: str = "float16",
     encoder: bool = False,
     latent_channels: int = 4,
 ):
-    batch = vae_input.shape[0]
-    height, width = vae_input.shape[2], vae_input.shape[3]
+    batch = pixels.shape[0]
+    height, width = pixels.shape[2], pixels.shape[3]
     if encoder:
         height = height // factor
         width = width // factor
