@@ -244,13 +244,11 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
             model_type = "unet_control"
         # Filters the modules
         module = AITemplate.loader.filter_modules(AIT_OS, sd, AIT_CUDA, batch_size, resolution, model_type)[0]
-        if keep_loaded == "disable":
-            # Delete any loaded modules if keep loaded is "disable" to save VRAM
+        if module['sha256'] not in AITemplate.unet:
             if len(AITemplate.unet.keys()) > 0:
                 to_delete = list(AITemplate.unet.keys())
                 for x in to_delete:
                     del AITemplate.unet[x]
-        if module['sha256'] not in AITemplate.unet:
             # Load the module if it is not loaded
             AITemplate.unet[module['sha256']] = AITemplate.loader.load_module(module['sha256'], module['url'])
             has_loaded = True
@@ -515,13 +513,12 @@ class AITemplateVAEEncode:
         global AITemplate
         resolution = max(pixels.shape[1], pixels.shape[2])
         model_type = "vae_encode"
-        if keep_loaded == "disable":
+        module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
+        if module["sha256"] not in AITemplate.vae:
             if len(AITemplate.vae.keys()) > 0:
                 to_delete = list(AITemplate.vae.keys())
                 for key in to_delete:
                     del AITemplate.vae[key]
-        module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if module["sha256"] not in AITemplate.vae:
             AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
             AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
                 aitemplate_module=AITemplate.vae[module["sha256"]],
@@ -560,13 +557,12 @@ class VAEEncodeForInpaint:
         global AITemplate
         resolution = max(pixels.shape[1], pixels.shape[2])
         model_type = "vae_encode"
-        if keep_loaded == "disable":
+        module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
+        if module["sha256"] not in AITemplate.vae:
             if len(AITemplate.vae.keys()) > 0:
                 to_delete = list(AITemplate.vae.keys())
                 for key in to_delete:
                     del AITemplate.vae[key]
-        module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if module["sha256"] not in AITemplate.vae:
             AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
             AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
                 aitemplate_module=AITemplate.vae[module["sha256"]],
@@ -627,14 +623,13 @@ class AITemplateVAEDecode:
     def decode(self, vae, keep_loaded, samples):
         global AITemplate
         resolution = max(samples["samples"].shape[2], samples["samples"].shape[3]) * 8
-        model_type = "vae"
+        model_type = "vae_decode"
         module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, 1, resolution, model_type)[0]
-        if keep_loaded == "disable":
+        if module["sha256"] not in AITemplate.vae:
             if len(AITemplate.vae.keys()) > 0:
                 to_delete = list(AITemplate.vae.keys())
                 for key in to_delete:
                     del AITemplate.vae[key]
-        if module["sha256"] not in AITemplate.vae:
             AITemplate.vae[module["sha256"]] = AITemplate.loader.load_module(module["sha256"], module["url"])
             AITemplate.vae[module["sha256"]] = AITemplate.loader.apply_vae(
                 aitemplate_module=AITemplate.vae[module["sha256"]],
