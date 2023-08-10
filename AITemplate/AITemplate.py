@@ -36,7 +36,7 @@ def cleanup_temp_library(prefix="ait", extension=".so"):
 
 cleanup_temp_library(prefix="", extension=".so")
 
-supported_ait_extensions = set(['.so', '.xz'])
+supported_ait_extensions = set(['.so', '.xz', '.dll'])
 base_path = os.path.dirname(os.path.realpath(__file__))
 modules_dir = os.path.join(base_path, "modules")
 folder_names_and_paths = {}
