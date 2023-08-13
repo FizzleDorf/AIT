@@ -168,6 +168,7 @@ def common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, 
     def callback(step, x0, x, total_steps):
         preview_bytes = None
         if previewer:
+            x0 = x0.to(comfy.model_management.get_torch_device())
             preview_bytes = previewer.decode_latent_to_preview_image(preview_format, x0)
         pbar.update_absolute(step + 1, total_steps, preview_bytes)
 
