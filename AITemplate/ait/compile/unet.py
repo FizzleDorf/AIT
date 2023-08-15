@@ -22,6 +22,7 @@ from ..modeling.unet_2d_condition import (
     UNet2DConditionModel as ait_UNet2DConditionModel,
 )
 from .util import mark_output
+from .release import process
 from ait.util.mapping import map_unet
 
 def compile_unet(
@@ -30,6 +31,7 @@ def compile_unet(
     height=(64, 2048),
     width=(64, 2048),
     clip_chunks=1,
+    out_dir="./out",
     work_dir="./tmp",
     dim=320,
     hidden_dim=1024,
@@ -73,6 +75,9 @@ def compile_unet(
     transformer_layers_per_block = 1,
     dtype="float16",
 ):
+    _batch_size = batch_size
+    _height = height
+    _width = width
     xl = False
     if projection_class_embeddings_input_dim is not None:
         xl = True
@@ -289,6 +294,14 @@ def compile_unet(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
     dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
-    compile_model(
+    total_usage = compile_model(
         Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
     )
+    sd = "v1"
+    if hidden_dim == 1024:
+        sd = "v2"
+    elif hidden_dim == 2048:
+        sd = "xl"
+    vram = round(total_usage / 1024 / 1024)
+    model_type = "unet_control" if controlnet else "unet"
+    process(work_dir, model_name, dll_name, target._arch, _height[-1], _width[-1], _batch_size[-1], vram, out_dir, sd, model_type)

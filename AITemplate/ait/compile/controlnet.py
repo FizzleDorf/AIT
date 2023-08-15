@@ -22,6 +22,7 @@ from ..modeling.controlnet import (
     ControlNetModel as ait_ControlNetModel,
 )
 from .util import mark_output
+from .release import process
 
 from ait.util.mapping import map_controlnet
 
@@ -39,6 +40,7 @@ def compile_controlnet(
     model_name="ControlNetModel",
     constants=False,
     work_dir="./tmp",
+    out_dir="./out",
     down_factor=8,
     use_linear_projection=False,
     block_out_channels=(320, 640, 1280, 1280),
@@ -61,6 +63,9 @@ def compile_controlnet(
     transformer_layers_per_block = 1,
     dtype="float16",
 ):
+    _batch_size = batch_size
+    _height = height
+    _width = width
     xl = False
     if projection_class_embeddings_input_dim is not None:
         xl = True
@@ -142,6 +147,13 @@ def compile_controlnet(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
     dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
-    compile_model(
+    total_usage = compile_model(
         Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
     )
+    sd = "v1"
+    if hidden_dim == 1024:
+        sd = "v2"
+    elif hidden_dim == 2048:
+        sd = "xl"
+    vram = round(total_usage / 1024 / 1024)
+    process(work_dir, model_name, dll_name, target._arch, _height[-1], _width[-1], _batch_size[-1], vram, out_dir, sd, "controlnet")

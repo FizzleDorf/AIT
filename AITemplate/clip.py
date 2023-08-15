@@ -60,6 +60,7 @@ from ait.compile.clip import compile_clip
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
 @click.option("--model-name", default="CLIPTextModel", help="module name")
 @click.option("--work-dir", default="./tmp", help="work directory")
+@click.option("--out-dir", default="./out", help="out directory")
 def compile_diffusers(
     hf_hub_or_path,
     batch_size,
@@ -71,6 +72,7 @@ def compile_diffusers(
     convert_conv_to_gemm=True,
     model_name="CLIPTextModel",
     work_dir="./tmp",
+    out_dir="./out",
 ):
     logging.getLogger().setLevel(logging.INFO)
     torch.manual_seed(4896)
@@ -110,6 +112,7 @@ def compile_diffusers(
         constants=include_constants,
         model_name=model_name,
         work_dir=work_dir,
+        out_dir=out_dir,
     )
 
 if __name__ == "__main__":

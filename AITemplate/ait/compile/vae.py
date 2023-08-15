@@ -21,6 +21,7 @@ from aitemplate.testing import detect_target
 
 from ..modeling.vae import AutoencoderKL as ait_AutoencoderKL
 from .util import mark_output
+from .release import process
 
 from ait.util.mapping import map_vae
 
@@ -56,8 +57,12 @@ def compile_vae(
     down_factor=8,
     dtype="float16",
     work_dir="./tmp",
+    out_dir="./tmp",
     vae_encode=False,
 ):
+    _batch_size = batch_size
+    _height = height
+    _width = width
     ait_vae = ait_AutoencoderKL(
         batch_size[0],
         input_size[0],
@@ -118,6 +123,10 @@ def compile_vae(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
     dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
-    compile_model(
+    total_usage = compile_model(
         Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
     )
+    sd = None
+    vram = round(total_usage / 1024 / 1024)
+    model_type = "vae_encode" if vae_encode else "vae_decode"
+    process(work_dir, model_name, dll_name, target._arch, _height[-1], _width[-1], _batch_size[-1], vram, out_dir, sd, model_type)

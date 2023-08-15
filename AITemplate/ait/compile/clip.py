@@ -19,6 +19,7 @@ from aitemplate.testing import detect_target
 
 from ..modeling.clip import CLIPTextTransformer as ait_CLIPTextTransformer
 from .util import mark_output
+from .release import process
 
 from ait.util.mapping import map_clip
 
@@ -38,7 +39,9 @@ def compile_clip(
     constants=True,
     model_name="CLIPTextModel",
     work_dir="./tmp",
+    out_dir="./out",
 ):
+    _batch_size = batch_size
     mask_seq = 0
     causal = True
 
@@ -79,6 +82,13 @@ def compile_clip(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
     dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
-    compile_model(
-        Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name
+    total_usage = compile_model(
+        Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
     )
+    sd = "L"
+    if dim == 1024:
+        sd = "H"
+    if dim == 1280:
+        sd = "G"
+    vram = round(total_usage / 1024 / 1024)
+    process(work_dir, model_name, dll_name, target._arch, None, None, _batch_size[-1], vram, out_dir, sd, "clip_text")

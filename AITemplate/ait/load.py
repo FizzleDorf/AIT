@@ -37,6 +37,8 @@ class AITLoader:
         self.extension = "dll" if os.name == "nt" else "so"
         try:
             self.modules = json.load(open(f"{modules_path}/modules.json", "r"))
+            if type(self.modules) == dict:
+                self.modules = list(self.modules.values())
         except FileNotFoundError:
             raise FileNotFoundError(f"modules.json not found in {modules_path}")
         except json.decoder.JSONDecodeError:

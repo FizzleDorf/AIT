@@ -54,7 +54,7 @@ from ait.compile.controlnet import compile_controlnet
     nargs=2,
     help="Minimum and maximum batch size",
 )
-@click.option("--clip-chunks", default=6, help="Maximum number of clip chunks")
+@click.option("--clip-chunks", default=10, help="Maximum number of clip chunks")
 @click.option(
     "--include-constants",
     default=None,
@@ -64,6 +64,7 @@ from ait.compile.controlnet import compile_controlnet
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
 @click.option("--model-name", default="ControlNetModel", help="module name")
 @click.option("--work-dir", default="./tmp", help="work directory")
+@click.option("--out-dir", default="./out", help="out directory")
 def compile_diffusers(
     hf_hub_or_path,
     width,
@@ -75,6 +76,7 @@ def compile_diffusers(
     convert_conv_to_gemm=True,
     model_name="ControlNetModel",
     work_dir="./tmp",
+    out_dir="./out",
 ):
     logging.getLogger().setLevel(logging.INFO)
     torch.manual_seed(4896)
@@ -121,6 +123,7 @@ def compile_diffusers(
         transformer_layers_per_block=pipe.config.transformer_layers_per_block
         if hasattr(pipe.config, "transformer_layers_per_block")
         else 1,
+        out_dir=out_dir,
     )
 
 

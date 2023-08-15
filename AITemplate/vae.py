@@ -80,6 +80,7 @@ from ait.compile.vae import compile_vae
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
 @click.option("--model-name", default="AutoencoderKL", help="module name")
 @click.option("--work-dir", default="./tmp", help="work directory")
+@click.option("--out-dir", default="./out", help="out directory")
 def compile_diffusers(
     hf_hub_or_path,
     width,
@@ -94,6 +95,7 @@ def compile_diffusers(
     convert_conv_to_gemm=True,
     model_name="AutoencoderKL",
     work_dir="./tmp",
+    out_dir="./out",
 ):
     logging.getLogger().setLevel(logging.INFO)
     torch.manual_seed(4896)
@@ -130,6 +132,7 @@ def compile_diffusers(
         dtype="float32" if fp32 else "float16",
         work_dir=work_dir,
         vae_encode=encoder,
+        out_dir=out_dir,
     )
 
 if __name__ == "__main__":

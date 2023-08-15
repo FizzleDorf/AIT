@@ -70,6 +70,7 @@ from ait.compile.unet import compile_unet
 @click.option("--controlnet", default=False, help="UNet for controlnet")
 @click.option("--model-name", default="UNet2DConditionModel", help="module name")
 @click.option("--work-dir", default="./tmp", help="work directory")
+@click.option("--out-dir", default="./out", help="out directory")
 def compile_diffusers(
     hf_hub_or_path,
     width,
@@ -84,6 +85,7 @@ def compile_diffusers(
     controlnet=False,
     model_name="UNet2DConditionModel",
     work_dir="./tmp",
+    out_dir="./out",
 ):
     logging.getLogger().setLevel(logging.INFO)
     torch.manual_seed(4896)
@@ -132,6 +134,7 @@ def compile_diffusers(
        work_dir=work_dir,
        down_factor=down_factor,
        dtype="float32" if fp32 else "float16",
+       out_dir=out_dir,
     )
 
 if __name__ == "__main__":
