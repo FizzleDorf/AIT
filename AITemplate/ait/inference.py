@@ -114,12 +114,15 @@ def controlnet_inference(
     timesteps: torch.Tensor,
     encoder_hidden_states: torch.Tensor,
     controlnet_cond: torch.Tensor,
+    add_embeds: torch.Tensor = None,
     device: str = "cuda",
     dtype: str = "float16",
+    benchmark: bool = False,
 ):
     if controlnet_cond.shape[0] != latent_model_input.shape[0]:
         controlnet_cond = controlnet_cond.expand(latent_model_input.shape[0], -1, -1, -1)
-    encoder_hidden_states = torch.cat(encoder_hidden_states['c_crossattn'], 1)
+    if type(encoder_hidden_states) == dict:
+        encoder_hidden_states = torch.cat(encoder_hidden_states['c_crossattn'], 1)
     inputs = {
         "latent_model_input": latent_model_input.permute((0, 2, 3, 1))
         .contiguous()
@@ -128,18 +131,35 @@ def controlnet_inference(
         "encoder_hidden_states": encoder_hidden_states.to(device),
         "control_hint": controlnet_cond.permute((0, 2, 3, 1)).contiguous().to(device),
     }
+    if add_embeds is not None:
+        inputs["add_embeds"] = add_embeds.to(device)
     if dtype == "float16":
         for k, v in inputs.items():
             inputs[k] = v.half()
-    ys = []
-    num_outputs = len(exe_module.get_output_name_to_index_map())
-    for i in range(num_outputs):
-        shape = exe_module.get_output_maximum_shape(i)
-        ys.append(torch.empty(shape).to(device))
+    ys = {}
+    for name, idx in exe_module.get_output_name_to_index_map().items():
+        shape = exe_module.get_output_maximum_shape(idx)
+        shape = torch.empty(shape).to(device)
         if dtype == "float16":
-            ys[i] = ys[i].half()
+            shape = shape.half()
+        ys[name] = shape
     exe_module.run_with_tensors(inputs, ys, graph_mode=False)
-    ys = [y.permute((0, 3, 1, 2)).float() for y in ys]
+    ys = {k: y.permute((0, 3, 1, 2)).float() for k, y in ys.items()}
+    if benchmark:
+        ys = {}
+        for name, idx in exe_module.get_output_name_to_index_map().items():
+            shape = exe_module.get_output_maximum_shape(idx)
+            shape = torch.empty(shape).to(device)
+            if dtype == "float16":
+                shape = shape.half()
+            ys[name] = shape
+        t, _, _ = exe_module.benchmark_with_tensors(
+            inputs=inputs,
+            outputs=ys,
+            count=50,
+            repeat=4,
+        )
+        print(f"controlnet latency: {t} ms, it/s: {1000 / t}")
     return ys
 
 

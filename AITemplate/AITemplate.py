@@ -362,6 +362,7 @@ class ControlNet(ControlBase):
         control_net_module = None
         # This function is called every inference step
         # Once a module is loaded modules are not filtered again for speed
+        #TODO: detection of v1, v2 and xl
         if len(AITemplate.controlnet.keys()) == 0:
             module = AITemplate.loader.filter_modules(AIT_OS, "v1", AIT_CUDA, batch, resolution, "controlnet")[0]
             AITemplate.controlnet[module['sha256']] = AITemplate.loader.load_module(module['sha256'], module['url'])
@@ -413,6 +414,7 @@ class ControlNet(ControlBase):
         else:
             # AITemplate inference, returns the same as regular
             control = self.aitemplate_controlnet(x_noisy, t, cond, self.cond_hint)
+            control = list(control.items())
         out = {'middle':[], 'output': []}
         autocast_enabled = torch.is_autocast_enabled()
 

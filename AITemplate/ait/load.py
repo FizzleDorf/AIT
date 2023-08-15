@@ -172,6 +172,8 @@ class AITLoader:
             hf_hub_or_path,
             subfolder=subfolder,
             revision=revision,
+            # variant="fp16",
+            use_safetensors=True,
             torch_dtype=torch_dtype_from_str(dtype)
         )
     
