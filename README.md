@@ -16,7 +16,7 @@ This repo can be cloned directly to ComfyUI's custom nodes folder.
 
 Adjust the path as required, the example assumes you are working from the ComfyUI repo.
 ```
-git clone https://github.com/hlky/AIT custom_nodes/AIT
+git clone https://github.com/FizzleDorf/AIT custom_nodes/AIT
 ```
 
 ### Modules
