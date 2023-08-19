@@ -342,7 +342,8 @@ class ControlNet(ControlBase):
             self.aitemplate = True
         else:
             self.aitemplate = None
-        self.control_model = control_model.to("cuda")
+        self.control_model = control_model
+        self.control_model_wrapped = comfy.sd.ModelPatcher(self.control_model, load_device=comfy.model_management.get_torch_device(), offload_device=comfy.model_management.unet_offload_device())
         self.cond_hint_original = None
         self.cond_hint = None
         self.strength = 1.0
@@ -406,11 +407,11 @@ class ControlNet(ControlBase):
                 precision_scope = contextlib.nullcontext
 
             with precision_scope(comfy.model_management.get_autocast_device(self.device)):
-                self.control_model = comfy.model_management.load_if_low_vram(self.control_model)
+                comfy.model_management.load_models_gpu([self.control_model_wrapped])
                 context = torch.cat(cond['c_crossattn'], 1)
                 y = cond.get('c_adm', None)
                 control = self.control_model(x=x_noisy, hint=self.cond_hint, timesteps=t, context=context, y=y)
-                self.control_model = comfy.model_management.unload_if_low_vram(self.control_model)
+                comfy.model_management.unload_model_clones(self.control_model_wrapped)
         else:
             # AITemplate inference, returns the same as regular
             control = self.aitemplate_controlnet(x_noisy, t, cond, self.cond_hint)
