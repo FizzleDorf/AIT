@@ -10,8 +10,8 @@ Experimental usage of [AITemplate](https://github.com/facebookincubator/AITempla
 
 ## ComfyUI custom node
 
-you can use this workflow for sdxl
-https://civitai.com/models/133818?modelVersionId=147337
+you can use this [workflow for sdxl](
+https://civitai.com/models/133818?modelVersionId=147337)
 thanks a bunch tdg8uu!
 
 ### Installation
