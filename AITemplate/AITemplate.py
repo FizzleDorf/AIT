@@ -332,7 +332,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
 comfy.sample.sample = sample
 
 
-from comfy.sd import ControlBase
+from comfy.controlnet import ControlBase
 class ControlNet(ControlBase):
     def __init__(self, control_model, global_average_pooling=False, device=None):
         super().__init__(device)
