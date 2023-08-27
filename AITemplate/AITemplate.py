@@ -8,6 +8,7 @@ import comfy.samplers
 import comfy.sample
 import comfy.utils
 import comfy.sd
+import comfy.controlnet
 import comfy.k_diffusion.external as k_diffusion_external
 from comfy.model_base import ModelType
 # so we can import nodes and latent_preview
@@ -399,7 +400,7 @@ class ControlNet(ControlBase):
             self.cond_hint = None
             self.cond_hint = comfy.utils.common_upscale(self.cond_hint_original, x_noisy.shape[3] * 8, x_noisy.shape[2] * 8, 'nearest-exact', "center").to(self.control_model.dtype).to(self.device)
         if x_noisy.shape[0] != self.cond_hint.shape[0]:
-            self.cond_hint = comfy.sd.broadcast_image_to(self.cond_hint, x_noisy.shape[0], batched_number)
+            self.cond_hint = comfy.controlnet.broadcast_image_to(self.cond_hint, x_noisy.shape[0], batched_number)
         if self.aitemplate is None:
             if self.control_model.dtype == torch.float16:
                 precision_scope = torch.autocast
@@ -453,7 +454,7 @@ class ControlNet(ControlBase):
         out.append(self.control_model)
         return out
 
-comfy.sd.ControlNet = ControlNet
+comfy.controlnet.ControlNet = ControlNet
 
 class AITemplateLoader:
     @classmethod
