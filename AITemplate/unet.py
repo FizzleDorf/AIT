@@ -52,7 +52,7 @@ from ait.compile.unet import compile_unet
     nargs=2,
     help="Minimum and maximum batch size",
 )
-@click.option("--clip-chunks", default=10, help="Maximum number of clip chunks")
+@click.option("--clip-chunks", default=30, help="Maximum number of clip chunks")
 @click.option(
     "--include-constants",
     default=None,
