@@ -32,7 +32,7 @@ class AITemplateModelWrapper(torch.nn.Module):
         mid_block_residual = None
         add_embeds = None
         if c_crossattn is not None:
-            encoder_hidden_states = torch.cat(c_crossattn, dim=1)
+            encoder_hidden_states = c_crossattn
         if c_concat is not None:
             latent_model_input = torch.cat([x] + c_concat, dim=1)
         if control is not None:
@@ -122,7 +122,7 @@ def controlnet_inference(
     if controlnet_cond.shape[0] != latent_model_input.shape[0]:
         controlnet_cond = controlnet_cond.expand(latent_model_input.shape[0], -1, -1, -1)
     if type(encoder_hidden_states) == dict:
-        encoder_hidden_states = torch.cat(encoder_hidden_states['c_crossattn'], 1)
+        encoder_hidden_states = encoder_hidden_states['c_crossattn']
     inputs = {
         "latent_model_input": latent_model_input.permute((0, 2, 3, 1))
         .contiguous()

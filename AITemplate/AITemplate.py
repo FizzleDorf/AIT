@@ -3,7 +3,7 @@ USE_LARGEST_UNET=False
 
 import os
 import sys
-import comfy.model_management
+from .ComfyCode import model_management
 import comfy.samplers
 import comfy.sample
 import comfy.utils
@@ -205,6 +205,7 @@ def load_additional_models(positive, negative):
 def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=1.0, disable_noise=False, start_step=None, last_step=None, force_full_denoise=False, noise_mask=None, sigmas=None, callback=None, disable_pbar=False, seed=None):
     global current_loaded_model
     global AITemplate
+
     use_aitemplate = 'aitemplate_keep_loaded' in model.model_options
     if use_aitemplate:
         keep_loaded = model.model_options['aitemplate_keep_loaded']
@@ -212,7 +213,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         device = torch.device("cpu")
     else:
         device = comfy.model_management.get_torch_device()
-
+    model_management.free_memory(1000000000000, device)
     has_loaded = False
     if use_aitemplate:
         """
@@ -409,7 +410,7 @@ class ControlNet(ControlBase):
 
             with precision_scope(comfy.model_management.get_autocast_device(self.device)):
                 comfy.model_management.load_models_gpu([self.control_model_wrapped])
-                context = torch.cat(cond['c_crossattn'], 1)
+                context = c_crossattn
                 y = cond.get('c_adm', None)
                 control = self.control_model(x=x_noisy, hint=self.cond_hint, timesteps=t, context=context, y=y)
                 comfy.model_management.unload_model_clones(self.control_model_wrapped)
