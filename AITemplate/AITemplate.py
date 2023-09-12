@@ -410,7 +410,7 @@ class ControlNet(ControlBase):
 
             with precision_scope(comfy.model_management.get_autocast_device(self.device)):
                 comfy.model_management.load_models_gpu([self.control_model_wrapped])
-                context = c_crossattn
+                context = cond['c_crossattn']
                 y = cond.get('c_adm', None)
                 control = self.control_model(x=x_noisy, hint=self.cond_hint, timesteps=t, context=context, y=y)
                 comfy.model_management.unload_model_clones(self.control_model_wrapped)
