@@ -410,9 +410,9 @@ class ControlNet(ControlBase):
 
             with precision_scope(comfy.model_management.get_autocast_device(self.device)):
                 comfy.model_management.load_models_gpu([self.control_model_wrapped])
-                context = cond['c_crossattn']
+                context = cond['c_crossattn'].to(self.device)
                 y = cond.get('c_adm', None)
-                control = self.control_model(x=x_noisy, hint=self.cond_hint, timesteps=t, context=context, y=y)
+                control = self.control_model(x=x_noisy.to(self.device), hint=self.cond_hint, timesteps=t, context=context.to(self.device), y=y)
         else:
             # AITemplate inference, returns the same as regular
             control = self.aitemplate_controlnet(x_noisy, t, cond, self.cond_hint)
