@@ -9,11 +9,16 @@ class AITemplateModelWrapper(torch.nn.Module):
     def __init__(
         self,
         unet_ait_exe: Model,
-        alphas_cumprod: torch.Tensor,
+        real_model: Model,
     ):
         super().__init__()
-        self.alphas_cumprod = alphas_cumprod
+        self.real_model = real_model
         self.unet_ait_exe = unet_ait_exe
+
+    def __getattr__(self, name):
+        if name in ['real_model', 'unet_ait_exe']:
+            return super().__getattr__(name)
+        return getattr(self.real_model, name) 
 
     def apply_model(
         self,
@@ -105,7 +110,7 @@ def unet_inference(
             repeat=4,
         )
         print(f"unet latency: {t} ms, it/s: {1000 / t}")
-    return noise_pred.cpu()
+    return noise_pred
 
 
 def controlnet_inference(

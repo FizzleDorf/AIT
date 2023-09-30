@@ -209,10 +209,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
     use_aitemplate = 'aitemplate_keep_loaded' in model.model_options
     if use_aitemplate:
         keep_loaded = model.model_options['aitemplate_keep_loaded']
-        # Use cpu for tensors to save VRAM
-        device = torch.device("cpu")
-    else:
-        device = comfy.model_management.get_torch_device()
+    device = model.load_device
     model_management.free_memory(1000000000000, device)
     has_loaded = False
     if use_aitemplate:
@@ -283,6 +280,8 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         comfy.model_management.load_model_gpu(model)
 
     real_model = model.model
+    if use_aitemplate:
+        setattr(real_model, 'aitemplate_use', AITemplate.unet.get(module['sha256']))
 
     noise = noise.to(device)
     latent_image = latent_image.to(device)
@@ -293,19 +292,6 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
     models = load_additional_models(positive, negative)
 
     sampler = comfy.samplers.KSampler(real_model, steps=steps, device=device, sampler=sampler_name, scheduler=scheduler, denoise=denoise, model_options=model.model_options)
-    if use_aitemplate:
-        # Wrapper for AITemplate
-        model_wrapper = AITemplateModelWrapper(AITemplate.unet[module['sha256']], real_model.alphas_cumprod)
-        # Overrides sampler's model_denoise
-        sampler.model_denoise = comfy.samplers.CFGNoisePredictor(model_wrapper)
-        # Overrides sampler's model_wrap
-        if real_model.model_type == ModelType.V_PREDICTION:
-            sampler.model_wrap = comfy.samplers.CompVisVDenoiser(sampler.model_denoise, quantize=True)
-        else:
-            sampler.model_wrap = k_diffusion_external.CompVisDenoiser(sampler.model_denoise, quantize=True)
-            sampler.model_wrap.model_type = sampler.model.model_type
-        # Overrides sampler's model_k
-        sampler.model_k = comfy.samplers.KSamplerX0Inpaint(sampler.model_wrap)
 
     samples = sampler.sample(noise, positive_copy, negative_copy, cfg=cfg, latent_image=latent_image, start_step=start_step, last_step=last_step, force_full_denoise=force_full_denoise, denoise_mask=noise_mask, sigmas=sigmas, callback=callback, disable_pbar=disable_pbar, seed=seed)
     samples = samples.cpu()
@@ -317,6 +303,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
         Cleans up current unet module
         Also any loaded controlnet modules
         """
+        del real_model.aitemplate_use
         del AITemplate.unet[module['sha256']]
         del sampler
         controlnet_keys = list(AITemplate.controlnet.keys())
@@ -332,6 +319,16 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
     return samples
 
 comfy.sample.sample = sample
+
+orig_wrap_model = comfy.samplers.wrap_model
+
+def wrap_model(model):
+    module = getattr(model, 'aitemplate_use', False)
+    if module:
+        model = AITemplateModelWrapper(module, model)
+    return orig_wrap_model(model)
+
+comfy.samplers.wrap_model = wrap_model
 
 
 from comfy.controlnet import ControlBase
