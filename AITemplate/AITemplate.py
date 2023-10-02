@@ -306,7 +306,8 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
             sampler.model_wrap.model_type = sampler.model.model_type
         # Overrides sampler's model_k
         sampler.model_k = comfy.samplers.KSamplerX0Inpaint(sampler.model_wrap)
-
+    latent_image.to(model.load_device)
+    noise.to(model.load_device)
     samples = sampler.sample(noise, positive_copy, negative_copy, cfg=cfg, latent_image=latent_image, start_step=start_step, last_step=last_step, force_full_denoise=force_full_denoise, denoise_mask=noise_mask, sigmas=sigmas, callback=callback, disable_pbar=disable_pbar, seed=seed)
     samples = samples.cpu()
 
@@ -409,6 +410,9 @@ class ControlNet(ControlBase):
                 precision_scope = contextlib.nullcontext
 
             with precision_scope(comfy.model_management.get_autocast_device(self.device)):
+                if(c_crossattn):
+                else:
+                    c_crossattn = 0
                 comfy.model_management.load_models_gpu([self.control_model_wrapped])
                 context = c_crossattn
                 y = cond.get('c_adm', None)
