@@ -17,7 +17,6 @@ import logging
 import click
 import torch
 from aitemplate.testing import detect_target
-
 try:
     from diffusers import ControlNetModel
 except ImportError:
@@ -26,11 +25,10 @@ except ImportError:
     )
 from ait.compile.controlnet import compile_controlnet
 
-
 @click.command()
 @click.option(
     "--hf-hub-or-path",
-    default="lllyasviel/sd-controlnet-canny",
+    default="./tmp/diffusers-pipeline/lllyasviel/sd-controlnet-canny",
     help="the local diffusers pipeline directory or hf hub path e.g. lllyasviel/sd-controlnet-canny",
 )
 @click.option(
@@ -49,12 +47,12 @@ from ait.compile.controlnet import compile_controlnet
 )
 @click.option(
     "--batch-size",
-    default=(1, 1),
+    default=(1, 4),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum batch size",
 )
-@click.option("--clip-chunks", default=30, help="Maximum number of clip chunks")
+@click.option("--clip-chunks", default=6, help="Maximum number of clip chunks")
 @click.option(
     "--include-constants",
     default=None,
@@ -64,7 +62,6 @@ from ait.compile.controlnet import compile_controlnet
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
 @click.option("--model-name", default="ControlNetModel", help="module name")
 @click.option("--work-dir", default="./tmp", help="work directory")
-@click.option("--out-dir", default="./out", help="out directory")
 def compile_diffusers(
     hf_hub_or_path,
     width,
@@ -76,7 +73,6 @@ def compile_diffusers(
     convert_conv_to_gemm=True,
     model_name="ControlNetModel",
     work_dir="./tmp",
-    out_dir="./out",
 ):
     logging.getLogger().setLevel(logging.INFO)
     torch.manual_seed(4896)
@@ -84,10 +80,15 @@ def compile_diffusers(
     if detect_target().name() == "rocm":
         convert_conv_to_gemm = False
 
+    assert (
+        width[0] % 64 == 0 and width[1] % 64 == 0
+    ), "Minimum Width and Maximum Width must be multiples of 64, otherwise, the compilation process will fail."
+    assert (
+        height[0] % 64 == 0 and height[1] % 64 == 0
+    ), "Minimum Height and Maximum Height must be multiples of 64, otherwise, the compilation process will fail."
+
     pipe = ControlNetModel.from_pretrained(
         hf_hub_or_path,
-        use_safetensors=True,
-        # variant="fp16",
         torch_dtype=torch.float16,
     ).to("cuda")
 
@@ -102,30 +103,7 @@ def compile_diffusers(
         constants=include_constants,
         model_name=model_name,
         work_dir=work_dir,
-        hidden_dim=pipe.config.cross_attention_dim,
-        use_linear_projection=pipe.config.get("use_linear_projection", False),
-        block_out_channels=pipe.config.block_out_channels,
-        down_block_types=pipe.config.down_block_types,
-        in_channels=pipe.config.in_channels,
-        class_embed_type=pipe.config.class_embed_type,
-        num_class_embeds=pipe.config.num_class_embeds,
-        dim=pipe.config.block_out_channels[0],
-        time_embedding_dim=None,
-        projection_class_embeddings_input_dim=pipe.config.projection_class_embeddings_input_dim
-        if hasattr(pipe.config, "projection_class_embeddings_input_dim")
-        else None,
-        addition_embed_type=pipe.config.addition_embed_type
-        if hasattr(pipe.config, "addition_embed_type")
-        else None,
-        addition_time_embed_dim=pipe.config.addition_time_embed_dim
-        if hasattr(pipe.config, "addition_time_embed_dim")
-        else None,
-        transformer_layers_per_block=pipe.config.transformer_layers_per_block
-        if hasattr(pipe.config, "transformer_layers_per_block")
-        else 1,
-        out_dir=out_dir,
     )
-
 
 if __name__ == "__main__":
     compile_diffusers()

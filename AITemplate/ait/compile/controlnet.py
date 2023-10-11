@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-import sys
 import torch
 from aitemplate.compiler import compile_model
 from aitemplate.frontend import IntVar, Tensor
@@ -22,7 +21,6 @@ from ..modeling.controlnet import (
     ControlNetModel as ait_ControlNetModel,
 )
 from .util import mark_output
-from .release import process
 
 from ait.util.mapping import map_controlnet
 
@@ -40,53 +38,10 @@ def compile_controlnet(
     model_name="ControlNetModel",
     constants=False,
     work_dir="./tmp",
-    out_dir="./out",
     down_factor=8,
-    use_linear_projection=False,
-    block_out_channels=(320, 640, 1280, 1280),
-    down_block_types= (
-        "CrossAttnDownBlock2D",
-        "CrossAttnDownBlock2D",
-        "CrossAttnDownBlock2D",
-        "DownBlock2D",
-    ),
-    in_channels=4,
-    out_channels=4,
-    sample_size=64,
-    class_embed_type=None,
-    num_class_embeds=None,
-    time_embedding_dim = None,
-    conv_in_kernel: int = 3,
-    projection_class_embeddings_input_dim = None,
-    addition_embed_type = None,
-    addition_time_embed_dim = None,
-    transformer_layers_per_block = 1,
-    dtype="float16",
 ):
-    _batch_size = batch_size
-    _height = height
-    _width = width
-    xl = False
-    if projection_class_embeddings_input_dim is not None:
-        xl = True
-    if isinstance(transformer_layers_per_block, int):
-        transformer_layers_per_block = [transformer_layers_per_block] * len(down_block_types)
-    if isinstance(transformer_layers_per_block, int):
-        transformer_layers_per_block = [transformer_layers_per_block] * len(down_block_types)
     batch_size = batch_size  # double batch size for unet
-    ait_mod = ait_ControlNetModel(
-        in_channels=in_channels,
-        down_block_types=down_block_types,
-        block_out_channels=block_out_channels,
-        cross_attention_dim=hidden_dim,
-        transformer_layers_per_block=transformer_layers_per_block,
-        use_linear_projection=use_linear_projection,
-        class_embed_type=class_embed_type,
-        addition_embed_type=addition_embed_type,
-        num_class_embeds=num_class_embeds,
-        projection_class_embeddings_input_dim=projection_class_embeddings_input_dim,
-        dtype="float16",
-    )
+    ait_mod = ait_ControlNetModel()
     ait_mod.name_parameter_tensor()
 
     pt_mod = pt_mod.eval()
@@ -117,43 +72,27 @@ def compile_controlnet(
         embedding_size = IntVar(values=list(clip_chunks), name="embedding_size")
 
     latent_model_input_ait = Tensor(
-        [batch_size, height_d, width_d, 4], name="latent_model_input", is_input=True
+        [batch_size, height_d, width_d, 4], name="input0", is_input=True
     )
-    timesteps_ait = Tensor([batch_size], name="timesteps", is_input=True)
+    timesteps_ait = Tensor([batch_size], name="input1", is_input=True)
     text_embeddings_pt_ait = Tensor(
-        [batch_size, embedding_size, hidden_dim], name="encoder_hidden_states", is_input=True
+        [batch_size, embedding_size, hidden_dim], name="input2", is_input=True
     )
     controlnet_condition_ait = Tensor(
-        [batch_size, height_c, width_c, 3], name="control_hint", is_input=True
+        [batch_size, height_c, width_c, 3], name="input3", is_input=True
     )
-
-    add_embeds = None
-    if xl:
-        add_embeds = Tensor(
-            [batch_size, projection_class_embeddings_input_dim], name="add_embeds", is_input=True, dtype=dtype
-        )
-
 
     Y = ait_mod(
         latent_model_input_ait,
         timesteps_ait,
         text_embeddings_pt_ait,
         controlnet_condition_ait,
-        add_embeds=add_embeds,
     )
     mark_output(Y)
 
     target = detect_target(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
-    dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
-    total_usage = compile_model(
-        Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
+    compile_model(
+        Y, target, work_dir, model_name, constants=params_ait if constants else None
     )
-    sd = "v1"
-    if hidden_dim == 1024:
-        sd = "v2"
-    elif hidden_dim == 2048:
-        sd = "xl"
-    vram = round(total_usage / 1024 / 1024)
-    process(work_dir, model_name, dll_name, target._arch, _height[-1], _width[-1], _batch_size[-1], vram, out_dir, sd, "controlnet")

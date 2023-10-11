@@ -15,11 +15,12 @@
 from typing import Optional, Tuple, Union
 
 from aitemplate.compiler import ops
-from aitemplate.compiler.base import Tensor
+from aitemplate.compiler.ops.common.epilogue import FuncEnum
+from aitemplate.compiler.base import IntImm, IntVar, IntVarTensor
 from aitemplate.frontend import nn
 
 from .embeddings import TimestepEmbedding, Timesteps
-from .unet_blocks import get_down_block, get_up_block, UNetMidBlock2DCrossAttn, CrossAttnDownBlock2D
+from .unet_blocks import get_down_block, get_up_block, UNetMidBlock2DCrossAttn
 
 
 class ControlNetConditioningEmbedding(nn.Module):
@@ -34,18 +35,18 @@ class ControlNetConditioningEmbedding(nn.Module):
 
     def __init__(
         self,
-        conditioning_embedding_channels: int,
-        conditioning_channels: int = 3,
-        block_out_channels: Tuple[int] = (16, 32, 96, 256),
+        # conditioning_embedding_channels: int,
+        # conditioning_channels: int = 3,
+        # block_out_channels: Tuple[int] = (16, 32, 96, 256),
     ):
         super().__init__()
-        self.conditioning_channels = conditioning_channels
-        if self.conditioning_channels % 4 != 0:
-            conditioning_channels = self.conditioning_channels + (4 - (self.conditioning_channels % 4))
-        else:
-            conditioning_channels = self.conditioning_channels
-        print(f"Conditioning channels: {conditioning_channels}")
-        self.conv_in = nn.Conv2dBias(conditioning_channels, block_out_channels[0], kernel_size=3, padding=1, stride=1)
+        """
+        Note: This is different to diffusers ControlNetConditioningEmbedding
+        Required Conv2dBiasFewChannels for the first layer, then Conv2dBias for the rest
+        Could be changed back to a loop and use parameters though,
+        but it ended up like this when debugging.
+        """
+        self.conv_in = nn.Conv2dBiasFewChannels(3, 16, 3, 1, 1)
 
         self.blocks = nn.ModuleList([])
         self.blocks.append(nn.Conv2dBias(16, 16, 3, 1, 1))
@@ -61,7 +62,8 @@ class ControlNetConditioningEmbedding(nn.Module):
         """
         Padding required!
         """
-        conditioning = ops.pad_last_dim(4, 4)(conditioning)
+        pad = ops.nhwc3to4()
+        conditioning = pad(conditioning)
         embedding = self.conv_in(conditioning)
         embedding = ops.silu(embedding)
 
@@ -96,19 +98,13 @@ class ControlNetModel(nn.Module):
         norm_num_groups: Optional[int] = 32,
         norm_eps: float = 1e-5,
         cross_attention_dim: int = 768,
-        transformer_layers_per_block: Union[int, Tuple[int]] = 1,
         attention_head_dim: Union[int, Tuple[int]] = 8,
-        num_attention_heads: Optional[Union[int, Tuple[int]]] = None,
         use_linear_projection: bool = False,
-        class_embed_type: Optional[str] = None,
-        addition_embed_type: Optional[str] = None,
-        num_class_embeds: Optional[int] = None,
         upcast_attention: bool = False,
         resnet_time_scale_shift: str = "default",
-        projection_class_embeddings_input_dim: Optional[int] = None,
         controlnet_conditioning_channel_order: str = "rgb",
+        conditioning_embedding_out_channels: Optional[Tuple[int]] = (16, 32, 96, 256),
         global_pool_conditions: bool = False,
-        dtype="float16",
     ):
         super().__init__()
         self.controlnet_conditioning_channel_order = (
@@ -117,7 +113,6 @@ class ControlNetModel(nn.Module):
         self.global_pool_conditions = global_pool_conditions
 
         # input
-        print(f"Input channels: {in_channels}")
         self.conv_in = nn.Conv2dBias(in_channels, block_out_channels[0], 3, 1, 1)
 
         # time
@@ -130,28 +125,9 @@ class ControlNetModel(nn.Module):
             timestep_input_dim,
             time_embed_dim,
         )
-        self.class_embed_type = class_embed_type
-        if class_embed_type is None and num_class_embeds is not None:
-            self.class_embedding = nn.Embedding(
-                [num_class_embeds, time_embed_dim], dtype=dtype
-            )
-        elif class_embed_type == "timestep":
-            self.class_embedding = TimestepEmbedding(
-                timestep_input_dim, time_embed_dim, dtype=dtype
-            )
-        elif class_embed_type == "identity":
-            self.class_embedding = nn.Identity(dtype=dtype)
-        else:
-            self.class_embedding = None
-
-        if addition_embed_type == "text_time":
-            # self.add_time_proj = Timesteps(addition_time_embed_dim, flip_sin_to_cos, freq_shift, dtype=dtype, arange_name="add_arange")
-            self.add_embedding = TimestepEmbedding(
-                projection_class_embeddings_input_dim, time_embed_dim, dtype=dtype
-            )
 
         # control net conditioning embedding
-        self.controlnet_cond_embedding = ControlNetConditioningEmbedding(block_out_channels[0])
+        self.controlnet_cond_embedding = ControlNetConditioningEmbedding()
 
         self.down_blocks = nn.ModuleList([])
         self.controlnet_down_blocks = nn.ModuleList([])
@@ -174,7 +150,6 @@ class ControlNetModel(nn.Module):
             down_block = get_down_block(
                 down_block_type,
                 num_layers=layers_per_block,
-                transformer_layers_per_block=transformer_layers_per_block[i],
                 in_channels=input_channel,
                 out_channels=output_channel,
                 temb_channels=time_embed_dim,
@@ -185,7 +160,6 @@ class ControlNetModel(nn.Module):
                 attn_num_head_channels=attention_head_dim[i],
                 downsample_padding=downsample_padding,
                 use_linear_projection=use_linear_projection,
-                dtype=dtype,
             )
             self.down_blocks.append(down_block)
 
@@ -207,7 +181,6 @@ class ControlNetModel(nn.Module):
         self.controlnet_mid_block = controlnet_block
 
         self.mid_block = UNetMidBlock2DCrossAttn(
-            transformer_layers_per_block=transformer_layers_per_block[-1],
             in_channels=mid_block_channel,
             temb_channels=time_embed_dim,
             resnet_eps=norm_eps,
@@ -218,7 +191,7 @@ class ControlNetModel(nn.Module):
             attn_num_head_channels=attention_head_dim[-1],
             resnet_groups=norm_num_groups,
             use_linear_projection=use_linear_projection,
-            dtype=dtype,
+            upcast_attention=upcast_attention,
         )
 
     def get_shape(self, sample):
@@ -231,55 +204,32 @@ class ControlNetModel(nn.Module):
         encoder_hidden_states,
         controlnet_cond,
         conditioning_scale: float = 1.0,
-        class_labels: Optional[Tensor] = None,
-        add_embeds: Optional[Tensor] = None,
     ) -> Tuple:
-        print("sample shape", self.get_shape(sample))
-        batch = sample._attrs['shape'][0]
         t_emb = self.time_proj(timestep)
         emb = self.time_embedding(t_emb)
-        if self.class_embedding is not None:
-            if class_labels is None:
-                raise ValueError(
-                    "class_labels should be provided when num_class_embeds > 0"
-                )
 
-            if self.class_embed_type == "timestep":
-                class_labels = self.time_proj(class_labels)
-
-            class_emb = ops.batch_gather()(
-                self.class_embedding.weight.tensor(), class_labels
-            )
-            emb = emb + class_emb
-
-        if add_embeds is not None:
-            aug_emb = self.add_embedding(add_embeds)
-            emb = emb + aug_emb
-            print("emb:", self.get_shape(emb))
         # 2. pre-process
         sample = self.conv_in(sample)
-        print("sample after", self.get_shape(sample))
-        print("controlnet_cond before: ", self.get_shape(controlnet_cond))
+
         controlnet_cond = self.controlnet_cond_embedding(controlnet_cond)
-        print("controlnet_cond after: ", self.get_shape(controlnet_cond))
-        shape = sample._attrs["shape"]
         controlnet_cond._attrs["shape"] = sample._attrs["shape"]
         sample = sample + controlnet_cond
-        # sample._attrs['shape'] = shape
         # 3. down
-        down_block_res_samples = (sample,)
-        for downsample_block in self.down_blocks:
-            if isinstance(downsample_block, CrossAttnDownBlock2D):
-                sample, res_samples = downsample_block(
-                    hidden_states=sample,
-                    temb=emb,
-                    encoder_hidden_states=encoder_hidden_states,
-                )
-            else:
-                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
-
-            down_block_res_samples += res_samples
-
+        down_block_res_samples = (sample,)  # up to but excluding last element
+        sample, res_samples = self.down_blocks[0](
+            hidden_states=sample, temb=emb, encoder_hidden_states=encoder_hidden_states
+        )
+        down_block_res_samples += res_samples
+        sample, res_samples = self.down_blocks[1](
+            hidden_states=sample, temb=emb, encoder_hidden_states=encoder_hidden_states
+        )
+        down_block_res_samples += res_samples
+        sample, res_samples = self.down_blocks[2](
+            hidden_states=sample, temb=emb, encoder_hidden_states=encoder_hidden_states
+        )
+        down_block_res_samples += res_samples
+        sample, res_samples = self.down_blocks[3](hidden_states=sample, temb=emb)
+        down_block_res_samples += res_samples
         # return sample
 
         # 4. mid
@@ -304,14 +254,19 @@ class ControlNetModel(nn.Module):
         ]
         mid_block_res_sample = mid_block_res_sample * conditioning_scale
 
-        output = ()
-
-        for i in range(len(down_block_res_samples)):
-            down_block_res_samples[i]._attrs["is_output"] = True
-            down_block_res_samples[i]._attrs["name"] = f"down_block_res_sample_{i}"
-            output += (down_block_res_samples[i],)
-        mid_block_res_sample._attrs["is_output"] = True
-        mid_block_res_sample._attrs["name"] = "mid_block_res_sample"
-        output += (mid_block_res_sample,)
-
-        return output
+        # return (down_block_res_samples, mid_block_res_sample)
+        return (
+            down_block_res_samples[0],
+            down_block_res_samples[1],
+            down_block_res_samples[2],
+            down_block_res_samples[3],
+            down_block_res_samples[4],
+            down_block_res_samples[5],
+            down_block_res_samples[6],
+            down_block_res_samples[7],
+            down_block_res_samples[8],
+            down_block_res_samples[9],
+            down_block_res_samples[10],
+            down_block_res_samples[11],
+            mid_block_res_sample,
+        )

@@ -9,17 +9,14 @@ from .inference import clip_inference, unet_inference, vae_inference, controlnet
 
 
 class AIT:
-    def __init__(self, path: str = None) -> None:
+    def __init__(self, path: str) -> None:
         self.modules = {}
         self.unet = {}
         self.vae = {}
         self.controlnet = {}
         self.clip = {}
         self.control_net = None
-        if path is not None:
-            self.loader = AITLoader(path)
-        else:
-            self.loader = AITLoader()
+        self.loader = AITLoader(path)
         self.supported = ['clip', 'controlnet', 'unet', 'vae']
 
     def load(self,
@@ -39,10 +36,10 @@ class AIT:
             self.modules["unet"] = self.loader.load(aitemplate_path)
             unet = self.loader.diffusers_unet(hf_hub_or_path)
             self.modules["unet"] = self.loader.apply_unet(self.modules["unet"], unet)
-        elif module_type == "vae_decode":
-            self.modules["vae_decode"] = self.loader.load(aitemplate_path)
+        elif module_type == "vae":
+            self.modules["vae"] = self.loader.load(aitemplate_path)
             vae = self.loader.diffusers_vae(hf_hub_or_path)
-            self.modules["vae_decode"] = self.loader.apply_vae(self.modules["vae_decode"], vae)
+            self.modules["vae"] = self.loader.apply_vae(self.modules["vae"], vae)
         elif module_type == "vae_encode":
             self.modules["vae_encode"] = self.loader.load(aitemplate_path)
             vae = self.loader.diffusers_vae(hf_hub_or_path)
@@ -80,10 +77,10 @@ class AIT:
             self.modules["unet"] = self.loader.load(aitemplate_path)
             unet = self.loader.compvis_unet(state_dict)
             self.modules["unet"] = self.loader.apply_unet(self.modules["unet"], unet)
-        elif module_type == "vae_decode":
-            self.modules["vae_decode"] = self.loader.load(aitemplate_path)
+        elif module_type == "vae":
+            self.modules["vae"] = self.loader.load(aitemplate_path)
             vae = self.loader.compvis_vae(state_dict)
-            self.modules["vae_decode"] = self.loader.apply_vae(self.modules["vae_decode"], vae)
+            self.modules["vae"] = self.loader.apply_vae(self.modules["vae"], vae)
         elif module_type == "vae_encode":
             self.modules["vae_encode"] = self.loader.load(aitemplate_path)
             vae = self.loader.compvis_vae(state_dict)
@@ -125,7 +122,7 @@ class AIT:
             timesteps=timesteps_pt,
             encoder_hidden_states=text_embeddings_pt,
             benchmark=benchmark,
-            add_embeds=add_embeds if xl else None,
+            add_embeds=add_embeds
         )
         print(output.shape)
         return output
@@ -161,17 +158,15 @@ class AIT:
         width: int = 64,
         dtype="float16",
         device="cuda",
-        benchmark: bool = False,
     ):
-        if "vae_decode" not in self.modules:
+        if "vae" not in self.modules:
             raise ValueError("vae module not loaded")
         vae_input = torch.randn(batch_size, latent_channels, height, width).to(device)
         if dtype == "float16":
             vae_input = vae_input.half()
         output = vae_inference(
-            self.modules["vae_decode"],
+            self.modules["vae"],
             vae_input=vae_input,
-            benchmark=benchmark,
         )
         print(output.shape)
         return output
@@ -219,9 +214,6 @@ class AIT:
         control_height: int = 512,
         control_width: int = 512,
         control_channels: int = 3,
-        add_embed_dim:int = 2816,
-        xl: bool = False,
-        benchmark: bool = False,
         device="cuda",
         dtype="float16",
     ):
@@ -229,24 +221,19 @@ class AIT:
         text_embeddings_pt = torch.randn(batch_size, sequence_length, hidden_dim).to(device)
         timesteps_pt = torch.Tensor([1] * batch_size).to(device)
         controlnet_input_pt = torch.randn(batch_size, control_channels, control_height, control_width).to(device)
-        if xl:
-            add_embeds = torch.randn(batch_size, add_embed_dim).to(device)
         if dtype == "float16":
             latent_model_input_pt = latent_model_input_pt.half()
             text_embeddings_pt = text_embeddings_pt.half()
             timesteps_pt = timesteps_pt.half()
             controlnet_input_pt = controlnet_input_pt.half()
-            if xl:
-                add_embeds = add_embeds.half()
-        outputs = controlnet_inference(
+        down_block_residuals, mid_block_residual = controlnet_inference(
             self.modules["controlnet"],
             latent_model_input=latent_model_input_pt,
             timesteps=timesteps_pt,
             encoder_hidden_states=text_embeddings_pt,
             controlnet_cond=controlnet_input_pt,
-            add_embeds=add_embeds if xl else None,
-            benchmark=benchmark,
         )
-        for block, value in outputs.items():
-            print(block, value.shape)
-        return outputs
+        for down_block_residual in down_block_residuals:
+            print(down_block_residual.shape)
+        print(mid_block_residual.shape)
+        return down_block_residuals, mid_block_residual

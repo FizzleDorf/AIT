@@ -28,26 +28,26 @@ from ait.compile.vae import compile_vae
 @click.command()
 @click.option(
     "--hf-hub-or-path",
-    default="runwayml/stable-diffusion-v1-5",
+    default="./tmp/diffusers-pipeline/runwayml/stable-diffusion-v1-5",
     help="the local diffusers pipeline directory or hf hub path e.g. runwayml/stable-diffusion-v1-5",
 )
 @click.option(
     "--width",
-    default=(64, 1024),
+    default=(64, 2048),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum width",
 )
 @click.option(
     "--height",
-    default=(64, 1024),
+    default=(64, 2048),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum height",
 )
 @click.option(
     "--batch-size",
-    default=(1, 1),
+    default=(1, 4),
     type=(int, int),
     nargs=2,
     help="Minimum and maximum batch size",
@@ -80,7 +80,6 @@ from ait.compile.vae import compile_vae
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
 @click.option("--model-name", default="AutoencoderKL", help="module name")
 @click.option("--work-dir", default="./tmp", help="work directory")
-@click.option("--out-dir", default="./out", help="out directory")
 def compile_diffusers(
     hf_hub_or_path,
     width,
@@ -95,13 +94,19 @@ def compile_diffusers(
     convert_conv_to_gemm=True,
     model_name="AutoencoderKL",
     work_dir="./tmp",
-    out_dir="./out",
 ):
     logging.getLogger().setLevel(logging.INFO)
     torch.manual_seed(4896)
 
     if detect_target().name() == "rocm":
         convert_conv_to_gemm = False
+
+    assert (
+        width[0] % 64 == 0 and width[1] % 64 == 0
+    ), "Minimum Width and Maximum Width must be multiples of 64, otherwise, the compilation process will fail."
+    assert (
+        height[0] % 64 == 0 and height[1] % 64 == 0
+    ), "Minimum Height and Maximum Height must be multiples of 64, otherwise, the compilation process will fail."
 
     pipe = AutoencoderKL.from_pretrained(
         hf_hub_or_path,
@@ -132,7 +137,6 @@ def compile_diffusers(
         dtype="float32" if fp32 else "float16",
         work_dir=work_dir,
         vae_encode=encoder,
-        out_dir=out_dir,
     )
 
 if __name__ == "__main__":

@@ -13,7 +13,6 @@
 #  limitations under the License.
 #
 
-import sys
 import torch
 from aitemplate.compiler import compile_model
 from aitemplate.frontend import IntVar, Tensor
@@ -21,7 +20,6 @@ from aitemplate.testing import detect_target
 
 from ..modeling.vae import AutoencoderKL as ait_AutoencoderKL
 from .util import mark_output
-from .release import process
 
 from ait.util.mapping import map_vae
 
@@ -30,8 +28,8 @@ def compile_vae(
     batch_size=(1, 8),
     height=(64, 2048),
     width=(64, 2048),
-    use_fp16_acc=True,
-    convert_conv_to_gemm=True,
+    use_fp16_acc=False,
+    convert_conv_to_gemm=False,
     model_name="AutoencoderKL",
     constants=True,
     block_out_channels=[128, 256, 512, 512],
@@ -57,12 +55,8 @@ def compile_vae(
     down_factor=8,
     dtype="float16",
     work_dir="./tmp",
-    out_dir="./tmp",
     vae_encode=False,
 ):
-    _batch_size = batch_size
-    _height = height
-    _width = width
     ait_vae = ait_AutoencoderKL(
         batch_size[0],
         input_size[0],
@@ -98,7 +92,7 @@ def compile_vae(
 
     ait_input = Tensor(
         shape=[batch_size, height_d, width_d, 3 if vae_encode else latent_channels],
-        name="pixels" if vae_encode else "latent",
+        name="vae_input",
         is_input=True,
         dtype=dtype
     )
@@ -106,7 +100,7 @@ def compile_vae(
     if vae_encode:
         sample = Tensor(
             shape=[batch_size, height_d, width_d, latent_channels],
-            name="random_sample",
+            name="vae_sample",
             is_input=True,
             dtype=dtype,
         )
@@ -122,11 +116,10 @@ def compile_vae(
     target = detect_target(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
-    dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
-    total_usage = compile_model(
-        Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
+    compile_model(
+        Y,
+        target,
+        work_dir,
+        model_name,
+        constants=params_ait if constants else None,
     )
-    sd = None
-    vram = round(total_usage / 1024 / 1024)
-    model_type = "vae_encode" if vae_encode else "vae_decode"
-    process(work_dir, model_name, dll_name, target._arch, _height[-1], _width[-1], _batch_size[-1], vram, out_dir, sd, model_type)

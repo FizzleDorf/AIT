@@ -12,17 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-import sys
 import torch
 from aitemplate.compiler import compile_model
-from aitemplate.frontend import IntVar, Tensor, DynamicProfileStrategy
+from aitemplate.frontend import IntVar, Tensor
 from aitemplate.testing import detect_target
 
 from ..modeling.unet_2d_condition import (
     UNet2DConditionModel as ait_UNet2DConditionModel,
 )
 from .util import mark_output
-from .release import process
 from ait.util.mapping import map_unet
 
 def compile_unet(
@@ -31,7 +29,6 @@ def compile_unet(
     height=(64, 2048),
     width=(64, 2048),
     clip_chunks=1,
-    out_dir="./out",
     work_dir="./tmp",
     dim=320,
     hidden_dim=1024,
@@ -75,9 +72,6 @@ def compile_unet(
     transformer_layers_per_block = 1,
     dtype="float16",
 ):
-    _batch_size = batch_size
-    _height = height
-    _width = width
     xl = False
     if projection_class_embeddings_input_dim is not None:
         xl = True
@@ -115,9 +109,10 @@ def compile_unet(
     pt_mod = pt_mod.eval()
     params_ait = map_unet(pt_mod, dim=dim, in_channels=in_channels, conv_in_key="conv_in_weight", dtype=dtype)
 
-    static_shape = width[0] == width[1] and height[0] == height[1]
+    static_shape = width[0] == width[1] and height[0] == height[1] and batch_size[0] == batch_size[1]
 
     if static_shape:
+        batch_size = batch_size[0] * 2  # double batch size for unet
         height = height[0] // down_factor
         width = width[0] // down_factor
         height_d = height
@@ -137,27 +132,26 @@ def compile_unet(
         height_8_d = height_8
         width_8_d = width_8
     else:
-        height = [x // down_factor for x in height]
-        width = [x // down_factor for x in width]
+        batch_size = batch_size[0], batch_size[1] * 2  # double batch size for unet
+        batch_size = IntVar(values=list(batch_size), name="batch_size")
+        height = height[0] // down_factor, height[1] // down_factor
+        width = width[0] // down_factor, width[1] // down_factor
         height_d = IntVar(values=list(height), name="height_d")
         width_d = IntVar(values=list(width), name="width_d")
         height_1_d = IntVar(values=list(height), name="height_1_d")
         width_1_d = IntVar(values=list(width), name="width_1_d")
-        height_2 = [x // 2 for x in height]
-        width_2 = [x // 2 for x in width]
-        height_4 = [x // 4 for x in height]
-        width_4 = [x // 4 for x in width]
-        height_8 = [x // 8 for x in height]
-        width_8 = [x // 8 for x in width]
+        height_2 = height[0] // 2, height[1] // 2
+        width_2 = width[0] // 2, width[1] // 2
+        height_4 = height[0] // 4, height[1] // 4
+        width_4 = width[0] // 4, width[1] // 4
+        height_8 = height[0] // 8, height[1] // 8
+        width_8 = width[0] // 8, width[1] // 8
         height_2_d = IntVar(values=list(height_2), name="height_2_d")
         width_2_d = IntVar(values=list(width_2), name="width_2_d")
         height_4_d = IntVar(values=list(height_4), name="height_4_d")
         width_4_d = IntVar(values=list(width_4), name="width_4_d")
         height_8_d = IntVar(values=list(height_8), name="height_8_d")
         width_8_d = IntVar(values=list(width_8), name="width_8_d")
-
-    batch_size = batch_size[0], batch_size[1] * 2  # double batch size for unet
-    batch_size = IntVar(values=list(batch_size), name="batch_size")
 
     if static_shape:
         embedding_size = 77
@@ -167,18 +161,18 @@ def compile_unet(
         
 
     latent_model_input_ait = Tensor(
-        [batch_size, height_d, width_d, in_channels], name="latent_model_input", is_input=True, dtype=dtype
+        [batch_size, height_d, width_d, in_channels], name="input0", is_input=True, dtype=dtype
     )
-    timesteps_ait = Tensor([batch_size], name="timesteps", is_input=True, dtype=dtype)
+    timesteps_ait = Tensor([batch_size], name="input1", is_input=True, dtype=dtype)
     text_embeddings_pt_ait = Tensor(
-        [batch_size, embedding_size, hidden_dim], name="encoder_hidden_states", is_input=True, dtype=dtype
+        [batch_size, embedding_size, hidden_dim], name="input2", is_input=True, dtype=dtype
     )
 
     class_labels = None
     #TODO: better way to handle this, enables class_labels for x4-upscaler
     if in_channels == 7:
         class_labels = Tensor(
-            [batch_size], name="class_labels", dtype="int64", is_input=True
+            [batch_size], name="input3", dtype="int64", is_input=True
         )
 
     add_embeds = None
@@ -293,15 +287,6 @@ def compile_unet(
     target = detect_target(
         use_fp16_acc=use_fp16_acc, convert_conv_to_gemm=convert_conv_to_gemm
     )
-    dll_name = model_name + ".dll" if sys.platform == "win32" else model_name + ".so"
-    total_usage = compile_model(
-        Y, target, work_dir, model_name, constants=params_ait if constants else None, dll_name=dll_name,
+    compile_model(
+        Y, target, work_dir, model_name, constants=params_ait if constants else None, do_optimize_graph=False if xl else True
     )
-    sd = "v1"
-    if hidden_dim == 1024:
-        sd = "v2"
-    elif hidden_dim == 2048:
-        sd = "xl"
-    vram = round(total_usage / 1024 / 1024)
-    model_type = "unet_control" if controlnet else "unet"
-    process(work_dir, model_name, dll_name, target._arch, _height[-1], _width[-1], _batch_size[-1], vram, out_dir, sd, model_type)

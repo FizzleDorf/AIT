@@ -32,7 +32,7 @@ class AITemplateModelWrapper(torch.nn.Module):
         mid_block_residual = None
         add_embeds = None
         if c_crossattn is not None:
-            encoder_hidden_states = c_crossattn
+            encoder_hidden_states = torch.cat(c_crossattn, dim=1)
         if c_concat is not None:
             latent_model_input = torch.cat([x] + c_concat, dim=1)
         if control is not None:
@@ -68,14 +68,14 @@ def unet_inference(
     height, width = latent_model_input.shape[2], latent_model_input.shape[3]
     timesteps_pt = timesteps.expand(batch)
     inputs = {
-        "latent_model_input": latent_model_input.permute((0, 2, 3, 1))
+        "input0": latent_model_input.permute((0, 2, 3, 1))
         .contiguous()
         .to(device),
-        "timesteps": timesteps_pt.to(device),
-        "encoder_hidden_states": encoder_hidden_states.to(device),
+        "input1": timesteps_pt.to(device),
+        "input2": encoder_hidden_states.to(device),
     }
     if class_labels is not None:
-        inputs["class_labels"] = class_labels.contiguous().to(device)
+        inputs["input3"] = class_labels.contiguous().to(device)
     if down_block_residuals is not None and mid_block_residual is not None:
         for i, y in enumerate(down_block_residuals):
             inputs[f"down_block_residual_{i}"] = y.permute((0, 2, 3, 1)).contiguous().to(device)
@@ -84,7 +84,7 @@ def unet_inference(
         inputs["add_embeds"] = add_embeds.to(device)
     if dtype == "float16":
         for k, v in inputs.items():
-            if k == "class_labels ":
+            if k == "input3":
                 continue
             inputs[k] = v.half()
     ys = []
@@ -114,52 +114,34 @@ def controlnet_inference(
     timesteps: torch.Tensor,
     encoder_hidden_states: torch.Tensor,
     controlnet_cond: torch.Tensor,
-    add_embeds: torch.Tensor = None,
     device: str = "cuda",
     dtype: str = "float16",
-    benchmark: bool = False,
 ):
     if controlnet_cond.shape[0] != latent_model_input.shape[0]:
         controlnet_cond = controlnet_cond.expand(latent_model_input.shape[0], -1, -1, -1)
-    if type(encoder_hidden_states) == dict:
-        encoder_hidden_states = encoder_hidden_states['c_crossattn']
+    encoder_hidden_states = torch.cat(encoder_hidden_states['c_crossattn'], 1)
     inputs = {
-        "latent_model_input": latent_model_input.permute((0, 2, 3, 1))
+        "input0": latent_model_input.permute((0, 2, 3, 1))
         .contiguous()
         .to(device),
-        "timesteps": timesteps.to(device),
-        "encoder_hidden_states": encoder_hidden_states.to(device),
-        "control_hint": controlnet_cond.permute((0, 2, 3, 1)).contiguous().to(device),
+        "input1": timesteps.to(device),
+        "input2": encoder_hidden_states.to(device),
+        "input3": controlnet_cond.permute((0, 2, 3, 1)).contiguous().to(device),
     }
-    if add_embeds is not None:
-        inputs["add_embeds"] = add_embeds.to(device)
     if dtype == "float16":
         for k, v in inputs.items():
             inputs[k] = v.half()
-    ys = {}
-    for name, idx in exe_module.get_output_name_to_index_map().items():
-        shape = exe_module.get_output_maximum_shape(idx)
-        shape = torch.empty(shape).to(device)
+    ys = []
+    num_outputs = len(exe_module.get_output_name_to_index_map())
+    for i in range(num_outputs):
+        shape = exe_module.get_output_maximum_shape(i)
+        ys.append(torch.empty(shape).to(device))
         if dtype == "float16":
-            shape = shape.half()
-        ys[name] = shape
+            ys[i] = ys[i].half()
     exe_module.run_with_tensors(inputs, ys, graph_mode=False)
-    ys = {k: y.permute((0, 3, 1, 2)).float() for k, y in ys.items()}
-    if benchmark:
-        ys = {}
-        for name, idx in exe_module.get_output_name_to_index_map().items():
-            shape = exe_module.get_output_maximum_shape(idx)
-            shape = torch.empty(shape).to(device)
-            if dtype == "float16":
-                shape = shape.half()
-            ys[name] = shape
-        t, _, _ = exe_module.benchmark_with_tensors(
-            inputs=inputs,
-            outputs=ys,
-            count=50,
-            repeat=4,
-        )
-        print(f"controlnet latency: {t} ms, it/s: {1000 / t}")
+    ys = [y.permute((0, 3, 1, 2)).float() for y in ys]
+    # down_block_residuals = [y for y in ys[:-1]]
+    # mid_block_residual = ys[-1]
     return ys
 
 
@@ -181,15 +163,14 @@ def vae_inference(
     else:
         height = height * factor
         width = width * factor
-    input_name = "pixels" if encoder else "latent"
     inputs = {
-        input_name: torch.permute(vae_input, (0, 2, 3, 1))
+        "vae_input": torch.permute(vae_input, (0, 2, 3, 1))
         .contiguous()
         .to(device),
     }
     if encoder:
         sample = torch.randn(batch, latent_channels, height, width)
-        inputs["random_sample"] = torch.permute(sample, (0, 2, 3, 1)).contiguous().to(device)
+        inputs["vae_sample"] = torch.permute(sample, (0, 2, 3, 1)).contiguous().to(device)
     if dtype == "float16":
         for k, v in inputs.items():
             inputs[k] = v.half()
@@ -219,8 +200,8 @@ def clip_inference(
     input_ids = input_ids.to(device)
     position_ids = torch.arange(seqlen).expand((batch, -1)).to(device)
     inputs = {
-        "input_ids": input_ids,
-        "position_ids": position_ids,
+        "input0": input_ids,
+        "input1": position_ids,
     }
     ys = []
     num_outputs = len(exe_module.get_output_name_to_index_map())

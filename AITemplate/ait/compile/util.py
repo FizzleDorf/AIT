@@ -12,17 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-def mark_output(ys):
-    if type(ys) != tuple:
-        ys = (ys, )
-    for i in range(len(ys)):
-        y = ys[i]
-        if type(y) == tuple:
-            for yy in y:
-                y_shape = [d._attrs["values"] for d in yy._attrs["shape"]]
-                y_name = yy._attrs["name"]
-                print("AIT {} shape: {}".format(y_name, y_shape))
-        else:
-            y_shape = [d._attrs["values"] for d in y._attrs["shape"]]
-            y_name = y._attrs["name"]
-            print("AIT {} shape: {}".format(y_name, y_shape))
+def mark_output(y):
+    if type(y) is not tuple:
+        y = (y,)
+    for i in range(len(y)):
+        y[i]._attrs["is_output"] = True
+        y[i]._attrs["name"] = "output_%d" % (i)
+        y_shape = [d._attrs["values"] for d in y[i]._attrs["shape"]]
+        print("AIT output_{} shape: {}".format(i, y_shape))

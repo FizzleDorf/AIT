@@ -2,17 +2,12 @@
  
 Experimental usage of [AITemplate](https://github.com/facebookincubator/AITemplate).
 
-[New XL Modules](https://huggingface.co/Fizzledorf/AITemplateXL)
 
-[Alternative Pre-compiled modules](https://huggingface.co/city96/AITemplate) (by City96)
+[Pre-compiled modules](https://huggingface.co/datasets/hlky/aitemplate)
 
-[Old Pre-compiled modules](https://huggingface.co/datasets/Fizzledorf/AITemplate_V1_V2) for earlier versions of this node.
+[Alternative Pre-compiled modules](https://huggingface.co/city96/AITemplate)
 
 ## ComfyUI custom node
-
-you can use this [workflow for sdxl](
-https://civitai.com/models/133818)
-thanks a bunch tdg8uu!
 
 ### Installation
 
@@ -20,7 +15,7 @@ This repo can be cloned directly to ComfyUI's custom nodes folder.
 
 Adjust the path as required, the example assumes you are working from the ComfyUI repo.
 ```
-git clone https://github.com/FizzleDorf/AIT custom_nodes/AIT
+git clone https://github.com/hlky/AIT custom_nodes/AIT
 ```
 
 ### Modules
